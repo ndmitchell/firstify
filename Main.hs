@@ -12,7 +12,7 @@ import System.Directory
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
-             | Output String
+             | Output String | Text | Html
              deriving (Show,Eq)
 
 
@@ -21,6 +21,8 @@ opts =
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
     ,Option "s" ["stats"]    (NoArg Stats   ) "Show additional statistics"
     ,Option "o" []     (ReqArg Output "file") "Where to put the output file"
+    ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
+    ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
     ,Option "?" ["help"]     (NoArg Help    ) "Show help message"
     ]
 
@@ -67,6 +69,8 @@ main = do
     
     putStrLn "Writing result"
     saveCore out c
+    when (Text `elem` acts) $ writeFile (out <.> "txt") (show c)
+    when (Html `elem` acts) $ writeFile (out <.> "htm") (coreHtml c)
 
 
 -- figure out where a file should go if we don't get an output location
