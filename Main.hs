@@ -2,6 +2,7 @@
 module Main(main) where
 
 import Control.Monad
+import Data.List
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
@@ -9,6 +10,8 @@ import System.Exit
 import System.FilePath
 import Yhc.Core
 import Yhc.Core.Firstify
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
@@ -77,5 +80,42 @@ main = do
 findOutput s = return $ replaceBaseName s (takeBaseName s <.> "1st")
 
 
+-- statistics:
+--    how many functions are under/over-staturated when applied
+--        both instances, and how many functions
+--    how many higher-order applications are there
 showStats :: Core -> IO ()
-showStats c = putStrLn "Todo: Stats"
+showStats c = putStr $ unlines
+        ["Higher-Order Statistics"
+        ,"HO Applications: " ++ pad hoApp
+        ,"Under-Sat calls: " ++ pad (length under)
+        ,"Under-Sat funs : " ++ pad (g under)
+        ,"Over -Sat calls: " ++ pad (length over)
+        ,"Over -Sat funs : " ++ pad (g over)
+        ]
+    where
+        arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
+
+        c2 = transformExpr appRules c
+
+        -- use all the CoreApp properties
+        -- plus wrap all CoreFun's in a CoreApp
+        appRules (CoreFun x) = CoreApp (CoreFun x) []
+        appRules (CoreApp x []) | not $ isCoreFun x = x
+        appRules (CoreApp (CoreApp x y) z) = CoreApp x (y++z)
+        appRules x = x
+
+        hoApp = length [() | CoreApp x y <- universeExpr c2, not $ isCoreFun x]
+
+        miss = [(x,d==GT)
+               | CoreApp (CoreFun x) args <- universeExpr c2
+               , Just a <- [Map.lookup x arity]
+               , let d = compare (length args) a
+               , d /= EQ]
+
+        (over,under) = partition snd miss
+
+        g = Set.size . Set.fromList . map fst
+
+        pad x = replicate (8 - length s) ' ' ++ s
+            where s = show x
