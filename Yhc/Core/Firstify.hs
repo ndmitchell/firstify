@@ -13,11 +13,14 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 
+g `on` f = \x y -> f x `g` f y
+
 ---------------------------------------------------------------------
 -- REYNOLDS METHOD
 
 reynolds :: Core -> Core
-reynolds c = c3
+reynolds c = c3{coreDatas = newDatas ++ coreDatas c3
+               ,coreFuncs = newFuncs ++ coreFuncs c3}
     where
         -- set up some information
         c2 = transformExpr appRules c
@@ -51,12 +54,42 @@ reynolds c = c3
                 name = if n == 1 then apFun else apFun <#> n
                 n = length args
         
-        ap_ fun args = CoreApp (CoreCon $ name ++ "_" ++ fun) args
-            where
-                name = if n == 0 then apTyp else apTyp <#> n
-                n = length args
+        ap_ fun args = CoreApp (CoreCon $ apTypGen fun (length args)) args
+
+        apTypGen fun n = (if n == 0 then apTyp else apTyp <#> n) ++ "_" ++ fun
 
         -- then figure out which functions we required
+        splitApFun x = if null s then 1 else read s
+            where s = dropWhile (== '_') $ drop (length apFun) x
+        
+        aps = [splitApFun x | CoreFun x <- universeExpr c3, apFun `isPrefixOf` x]
+
+        arityApps = [CoreFunc (apFun <#> i) ("x":vars) $
+                              foldl (\x y -> CoreApp (CoreFun apFun) [x,CoreVar y]) (CoreVar "x") vars
+                    | i <- Set.toAscList $ Set.fromList aps, i /= 1
+                    , let vars = ['y':show j | j <- [1..i]] ]
+
+        splitApTyp x = if not $ isDigit $ head s then (0, s)
+                       else let (a,_:b) = break (== '_') s in (read a, b)
+            where s = dropWhile (== '_') $ drop (length apTyp) x
+
+        dats = map head $ groupBy ((==) `on` snd) $ sort
+               [splitApTyp x | CoreCon x <- universeExpr c3, apTyp `isPrefixOf` x]
+
+        newDatas = [CoreData apTyp [] $
+                        [CoreCtor (apTypGen c j) [('T':show k, Nothing) | k <- [1..j]]
+                        | (i,c) <- dats, j <- [i..(arr Map.! c) - 1]]
+                   ]
+
+        mainAp = CoreFunc apFun ["x","z"] $ CoreCase (CoreVar "x") $
+                 [(PatCon (apTypGen c j) vars,
+                  CoreApp (if j+1 == n then CoreFun c else CoreCon $ apTypGen c (j+1))
+                          (map CoreVar vars ++ [CoreVar "z"])
+                  )
+                 | (i,c) <- dats, let n = arr Map.! c, j <- [i..n-1]
+                 , let vars = ['y':show k | k <- [1..j]] ]
+
+        newFuncs = mainAp : arityApps
 
 
 findApFun :: Core -> CoreFuncName
