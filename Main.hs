@@ -66,6 +66,8 @@ main = do
         putStrLn "Performing Reynold's firstification"
         return $ reynolds c
 
+    when (Stats `elem` acts && Reynolds `elem` acts) $ showStats c
+
     out <- case [o | Output o <- acts] of
                o:_ -> return o
                _ -> findOutput $ head files
