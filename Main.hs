@@ -107,7 +107,7 @@ showStats c = putStr $ unlines
         appRules (CoreApp (CoreApp x y) z) = CoreApp x (y++z)
         appRules x = x
 
-        hoApp = length [() | CoreApp x y <- universeExpr c2, not $ isCoreFun x]
+        hoApp = length [() | CoreApp x y <- universeExpr c2, not $ isCoreFun x || isCoreCon x]
 
         miss = [(x,d==GT)
                | CoreApp (CoreFun x) args <- universeExpr c2
