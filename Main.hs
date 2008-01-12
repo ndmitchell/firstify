@@ -7,6 +7,8 @@ import System.Exit
 import Control.Monad
 import Yhc.Core
 import Yhc.Core.Firstify
+import System.FilePath
+import System.Directory
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
@@ -46,4 +48,30 @@ main = do
         exitWith (ExitFailure 1)
 
     c <- loadCore $ head files
-    putStrLn "Read file"
+    
+    when (Stats `elem` acts) $ showStats c
+
+    c <- if Mitchell `notElem` acts then return c else do
+        putStrLn "Performing Mitchell firstification"
+        return $ firstify c
+
+    when (Stats `elem` acts && Mitchell `elem` acts) $ showStats c
+
+    c <- if Reynolds `notElem` acts then return c else do
+        putStrLn "Performing Reynold's firstification"
+        return $ reynolds c
+
+    out <- case [o | Output o <- acts] of
+               o:_ -> return o
+               _ -> findOutput $ head files
+    
+    putStrLn "Writing result"
+    saveCore out c
+
+
+-- figure out where a file should go if we don't get an output location
+findOutput s = return $ replaceBaseName s (takeBaseName s <.> "1st")
+
+
+showStats :: Core -> IO ()
+showStats c = putStrLn "Todo: Stats"
