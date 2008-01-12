@@ -1,14 +1,14 @@
 
 module Main(main) where
 
+import Control.Monad
 import System.Console.GetOpt
+import System.Directory
 import System.Environment
 import System.Exit
-import Control.Monad
+import System.FilePath
 import Yhc.Core
 import Yhc.Core.Firstify
-import System.FilePath
-import System.Directory
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
