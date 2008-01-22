@@ -47,34 +47,43 @@ fixM f x = do
     if x == x2 then return x2 else fixM f x2 
 
 
--- make sure every function is given enough arguments, by introducing lambdas
-lambdas :: Core -> SS Core
-lambdas c = transformExprM f c
-    where
-        arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
-
-        f (CoreFun x) = do
-            vs <- getVars (arr x)
-            return $ coreLam vs (coreApp (CoreFun x) (map CoreVar vs))
-        f x = return x
-
-
 -- In each step first inline all top-level function bindings
 -- and let's that appear to be bound to an unsaturated
 --
 -- Then specialise each value
 step :: Core -> SS Core
-step = fixM (simplify ) -- * promote * inline * specialise)
+step = lambdas * simplify
     where
         (*) a b x = do
             x2 <- a x
-            if x == x2 then b x2 else return x2
+            if x == x2 then b x2 else (*) a b x2
+
+
+-- make sure every function is given enough arguments, by introducing lambdas
+lambdas :: Core -> SS Core
+lambdas c = descendExprM f c
+    where
+        arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
+
+        f (CoreApp (CoreFun x) xs)
+                | extra <= 0 = return $ coreApp (CoreFun x) xs
+                | otherwise = do
+                    vs <- getVars (arr x)
+                    return $ coreApp (coreLam vs (coreApp (CoreFun x) (map CoreVar vs))) xs
+            where extra = arr x - length xs
+        
+        f (CoreFun x) = f $ CoreApp (CoreFun x) []
+        f x = descendM f x
 
 
 -- perform basic simplification to remove lambda's
+-- basic idea is to lift lambda's outwards to the top
 simplify :: Core -> SS Core
-simplify = return . transformExpr f
+simplify = return . applyFuncCore g . transformExpr f
     where
+        g (CoreFunc name args (CoreLam vars body)) = CoreFunc name (args++vars) body
+        g x = x
+
         f (CoreApp (CoreLam vs x) ys) = coreApp (coreLam vs2 x2) ys2
             where
                 i = min (length vs) (length ys)
@@ -84,25 +93,6 @@ simplify = return . transformExpr f
                 x2 = coreLet bind $ replaceFreeVars rep x
 
         f x = x
-
-
--- BEFORE: even = (.) not odd
--- AFTER:  even x = (.) not odd x 
-promote :: Core -> SS Core
-promote c = do
-        res <- mapM f (coreFuncs c)
-        return c{coreFuncs = res}
-    where
-        arr = arities c
-
-        f (CoreFunc name vars body) | extra > 0 = 
-            logger ("Promoting " ++ name ++ " by " ++ show extra) $ do
-                args <- getVars extra
-                body <- return $ coreApp body (map CoreVar args)
-                return $ CoreFunc name (vars++args) body
-            where extra = arity arr body
-        f x = return x
-
 
 
 -- BEFORE: box = [even]
