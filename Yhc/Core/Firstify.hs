@@ -146,7 +146,11 @@ fixM f x = do
 --
 -- Then specialise each value
 step :: Core -> SS Core
-step c = return c
+step = fixM (promote * inline * specialise)
+    where
+        (*) a b x = do
+            x2 <- a x
+            if x == x2 then b x2 else return x2
 
 
 -- BEFORE: even = (.) not odd
