@@ -9,6 +9,7 @@ import Control.Monad.State
 import qualified Data.Homeomorphic as H
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Data.List
 import Debug.Trace
 
 
@@ -34,7 +35,7 @@ instance UniqueId S where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = evalState (fixM step =<< uniqueBoundVarsCore c2) s0
+mitchell c = evalState (fixM step =<< lambdas =<< uniqueBoundVarsCore c2) s0
     where
         s0 = S Set.empty H.empty Map.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCoreLam] c
@@ -46,16 +47,43 @@ fixM f x = do
     if x == x2 then return x2 else fixM f x2 
 
 
+-- make sure every function is given enough arguments, by introducing lambdas
+lambdas :: Core -> SS Core
+lambdas c = transformExprM f c
+    where
+        arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
+
+        f (CoreFun x) = do
+            vs <- getVars (arr x)
+            return $ coreLam vs (coreApp (CoreFun x) (map CoreVar vs))
+        f x = return x
+
+
 -- In each step first inline all top-level function bindings
 -- and let's that appear to be bound to an unsaturated
 --
 -- Then specialise each value
 step :: Core -> SS Core
-step = fixM (promote * inline * specialise)
+step = fixM (simplify ) -- * promote * inline * specialise)
     where
         (*) a b x = do
             x2 <- a x
             if x == x2 then b x2 else return x2
+
+
+-- perform basic simplification to remove lambda's
+simplify :: Core -> SS Core
+simplify = return . transformExpr f
+    where
+        f (CoreApp (CoreLam vs x) ys) = coreApp (coreLam vs2 x2) ys2
+            where
+                i = min (length vs) (length ys)
+                (vs1,vs2) = splitAt i vs
+                (ys1,ys2) = splitAt i ys
+                (rep,bind) = partition (\(a,b) -> isCoreVar b || countFreeVar a x <= 1) (zip vs1 ys1)
+                x2 = coreLet bind $ replaceFreeVars rep x
+
+        f x = x
 
 
 -- BEFORE: even = (.) not odd
@@ -70,7 +98,7 @@ promote c = do
         f (CoreFunc name vars body) | extra > 0 = 
             logger ("Promoting " ++ name ++ " by " ++ show extra) $ do
                 args <- getVars extra
-                body <- simplify $ coreApp body (map CoreVar args)
+                body <- return $ coreApp body (map CoreVar args)
                 return $ CoreFunc name (vars++args) body
             where extra = arity arr body
         f x = return x
@@ -134,7 +162,3 @@ boxedFun ask = f
         f (CoreLet _ x) = f x
         f (CorePos _ x) = f x
         f x = arity ask x > 0
-
-
-simplify :: CoreExpr -> SS CoreExpr
-simplify x = return x
