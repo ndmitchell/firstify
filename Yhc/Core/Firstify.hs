@@ -111,6 +111,7 @@ findName seen pre = if null seen2 then pre else pre ++ show (head $ filter isVal
 ---------------------------------------------------------------------
 -- MY METHOD - FROM MY THESIS
 
+type SS a = State S a
 
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
            ,specialised :: H.Homeomorphic CoreExpr1 () -- which have been specialised (termination check)
@@ -144,22 +145,26 @@ fixM f x = do
 -- and let's that appear to be bound to an unsaturated
 --
 -- Then specialise each value
-step :: Core -> State S Core
+step :: Core -> SS Core
 step c = return c
 
 
-{-
-
 -- BEFORE: even = (.) not odd
 -- AFTER:  even x = (.) not odd x 
-promote :: Core -> State S Core
-promote c = do
-    let a = arities c
+promote :: Core -> SS Core
+promote c = return c
+
+
+-- BEFORE: box = [even]
+-- AFTER:  all uses of box are inlined
+inline :: Core -> SS Core
+inline c = return c
+
+
+-- BEFORE: map even x
+-- AFTER:  map_even x
+specialise :: Core -> SS Core
+specialise c = return c
 
 
 
-unsaturated :: Core -> CoreExpr -> Bool
-unsaturated = False
-
-
--}
