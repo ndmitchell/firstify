@@ -58,7 +58,7 @@ main = do
 
     c <- if Mitchell `notElem` acts then return c else do
         putStrLn "Performing Mitchell firstification"
-        return $ firstify c
+        return $ mitchell c
 
     when (Stats `elem` acts && Mitchell `elem` acts) $ showStats c
 

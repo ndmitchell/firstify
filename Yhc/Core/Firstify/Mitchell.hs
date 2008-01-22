@@ -1,5 +1,5 @@
 
-module Yhc.Core.Firstify.Mitchell(firstify) where
+module Yhc.Core.Firstify.Mitchell(mitchell) where
 
 import Yhc.Core hiding (uniqueBoundVarsCore)
 import Yhc.Core.FreeVar3
@@ -28,8 +28,8 @@ instance UniqueId S where
 
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
-firstify :: Core -> Core
-firstify c = evalState (fixM step =<< uniqueBoundVarsCore c2) s0
+mitchell :: Core -> Core
+mitchell c = evalState (fixM step =<< uniqueBoundVarsCore c2) s0
     where
         s0 = S Set.empty H.empty [] 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCoreLam] c
