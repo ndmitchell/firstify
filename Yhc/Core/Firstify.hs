@@ -112,11 +112,11 @@ findName seen pre = if null seen2 then pre else pre ++ show (head $ filter isVal
 -- MY METHOD - FROM MY THESIS
 
 
-data S = S {inlined :: Set.Set CoreFuncName
-           ,specialised :: H.Homeomorphic CoreExpr1 ()
-           ,special :: [(CoreExpr, CoreFuncName)]
-           ,varId :: Int
-           ,funcId :: Int
+data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
+           ,specialised :: H.Homeomorphic CoreExpr1 () -- which have been specialised (termination check)
+           ,special :: [(CoreExpr, CoreFuncName)] -- which special variants do we have (CoreVar "" is wildcard)
+           ,varId :: Int -- what is the next variable id to use
+           ,funcId :: Int -- what is the next function id to use
            }
 
 
