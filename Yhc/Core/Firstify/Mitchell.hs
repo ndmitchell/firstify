@@ -56,7 +56,18 @@ step = fixM (promote * inline * specialise)
 -- BEFORE: even = (.) not odd
 -- AFTER:  even x = (.) not odd x 
 promote :: Core -> SS Core
-promote c = return c
+promote c = do
+        res <- mapM f (coreFuncs c)
+        return c{coreFuncs = res}
+    where
+        arr = arities c
+
+        f (CoreFunc name vars body) | extra > 0 = do
+                args <- getVars extra
+                body <- simplify $ coreApp body (map CoreVar args)
+                return $ CoreFunc name (vars++args) body
+            where extra = arity arr body
+        f x = return x
 
 
 -- BEFORE: box = [even]
@@ -72,3 +83,13 @@ specialise c = return c
 
 
 
+arities :: Core -> (CoreFuncName -> Int)
+arities c = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
+
+
+arity :: (CoreFuncName -> Int) -> CoreExpr -> Int
+arity _ _ = 0
+
+
+simplify :: CoreExpr -> SS CoreExpr
+simplify x = return x
