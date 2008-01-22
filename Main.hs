@@ -90,6 +90,7 @@ showStats :: Core -> IO ()
 showStats c = putStr $ unlines
         ["Higher-Order Statistics"
         ,"HO Applications: " ++ pad hoApp
+        ,"Lambdas        : " ++ pad lamb
         ,"Under-Sat calls: " ++ pad (length under)
         ,"Under-Sat funs : " ++ pad (g under)
         ,"Over -Sat calls: " ++ pad (length over)
@@ -108,6 +109,7 @@ showStats c = putStr $ unlines
         appRules x = x
 
         hoApp = length [() | CoreApp x y <- universeExpr c2, not $ isCoreFun x || isCoreCon x]
+        lamb = length [() | CoreLam _ _ <- universeExpr c2]
 
         miss = [(x,d==GT)
                | CoreApp (CoreFun x) args <- universeExpr c2
