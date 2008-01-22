@@ -15,7 +15,7 @@ type SS a = State S a
 
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
            ,specialised :: H.Homeomorphic CoreExpr1 () -- which have been specialised (termination check)
-           ,special :: [(CoreExpr, CoreFuncName)] -- which special variants do we have (CoreVar "" is wildcard)
+           ,special :: Map.Map CoreExpr CoreFuncName -- which special variants do we have (CoreVar "" is wildcard)
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
            }
@@ -31,7 +31,7 @@ instance UniqueId S where
 mitchell :: Core -> Core
 mitchell c = evalState (fixM step =<< uniqueBoundVarsCore c2) s0
     where
-        s0 = S Set.empty H.empty [] 0 (uniqueFuncsNext c2)
+        s0 = S Set.empty H.empty Map.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCoreLam] c
 
 
