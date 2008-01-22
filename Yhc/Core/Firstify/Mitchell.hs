@@ -9,6 +9,11 @@ import Control.Monad.State
 import qualified Data.Homeomorphic as H
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Debug.Trace
+
+
+logger :: String -> SS a -> SS a
+logger x = id
 
 
 type SS a = State S a
@@ -62,7 +67,8 @@ promote c = do
     where
         arr = arities c
 
-        f (CoreFunc name vars body) | extra > 0 = do
+        f (CoreFunc name vars body) | extra > 0 = 
+            logger ("Promoting " ++ name ++ " by " ++ show extra) $ do
                 args <- getVars extra
                 body <- simplify $ coreApp body (map CoreVar args)
                 return $ CoreFunc name (vars++args) body
@@ -70,10 +76,28 @@ promote c = do
         f x = return x
 
 
+
 -- BEFORE: box = [even]
 -- AFTER:  all uses of box are inlined
 inline :: Core -> SS Core
-inline c = return c
+inline c = do
+    s <- get
+    let arr = arities c
+        done = inlined s
+        todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
+                            , name `Set.notMember` done, boxedFun arr body]
+    if Map.null todo then return c else 
+        logger ("Inlining: " ++ show (Map.keys todo)) $ do
+            modify $ \s -> s{inlined = Set.fromList (Map.keys todo) `Set.union` done}
+            transformExprM (f (`Map.lookup` todo)) c
+    where
+        f mp (CoreFun x) = case mp x of
+                                Nothing -> return $ CoreFun x
+                                Just y -> do
+                                    y <- duplicateExpr y
+                                    return y
+        f mp x = return x
+
 
 
 -- BEFORE: map even x
@@ -88,7 +112,28 @@ arities c = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- cor
 
 
 arity :: (CoreFuncName -> Int) -> CoreExpr -> Int
-arity _ _ = 0
+arity ask = f
+    where
+        nat = max 0
+
+        f (CoreLam vs x) = length vs + f x
+        f (CoreApp x xs) = nat (f x - length xs)
+        f (CoreFun x) = ask x
+        f (CoreCase _ alts) = maximum $ map (f . snd) alts
+        f (CoreLet _ x) = f x
+        f (CorePos _ x) = f x
+        f _ = 0
+
+-- is there a function, possibly hiding within a constructor
+boxedFun :: (CoreFuncName -> Int) -> CoreExpr -> Bool
+boxedFun ask = f
+    where
+        f (CoreLam vs x) = True
+        f (CoreApp (CoreCon x) xs) = any f xs
+        f (CoreCase _ alts) = any (f . snd) alts
+        f (CoreLet _ x) = f x
+        f (CorePos _ x) = f x
+        f x = arity ask x > 0
 
 
 simplify :: CoreExpr -> SS CoreExpr
