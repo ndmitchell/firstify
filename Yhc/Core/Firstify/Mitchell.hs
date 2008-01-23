@@ -5,6 +5,7 @@ import Yhc.Core hiding (uniqueBoundVarsCore)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
 
+import Control.Monad
 import Control.Monad.State
 import qualified Data.Homeomorphic as H
 import qualified Data.Set as Set
@@ -35,10 +36,10 @@ instance UniqueId S where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = evalState (fixM step =<< lambdas =<< uniqueBoundVarsCore c2) s0
+mitchell c = evalState (step =<< uniqueBoundVarsCore c2) s0
     where
         s0 = S Set.empty H.empty Map.empty 0 (uniqueFuncsNext c2)
-        c2 = ensureInvariants [NoRecursiveLet,NoCoreLam] c
+        c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
 fixM :: (Eq a, Monad m) => (a -> m a) -> a -> m a
@@ -52,39 +53,65 @@ fixM f x = do
 --
 -- Then specialise each value
 step :: Core -> SS Core
-step = lambdas * simplify
+step = ("lambdas",lambdas) * ("simplify",simplify) -- * inline
     where
+        -- assume 'a' finds a fixed point on its own
         (*) a b x = do
-            x2 <- a x
-            if x == x2 then b x2 else (*) a b x2
+            let ap (name,func) x = trace name $ checkConfluent name func x
+            x2 <- ap a x
+            x3 <- ap b x2
+            if x3 == x2 then return x2 else (*) a b x3
+
+
+diagnose msg a b = head [error $ msg ++ ":\n" ++ show c ++ "\n======\n" ++ show d
+                        | (c,d) <- zip (coreFuncs a) (coreFuncs b), c /= d]
+
+
+-- check a function is confluent
+checkConfluent :: String -> (Core -> SS Core) -> Core -> SS Core
+checkConfluent name f x = do
+    x2 <- f x
+    x3 <- f x2
+    if x2 == x3
+        then return x2
+        else diagnose name x2 x3
 
 
 -- make sure every function is given enough arguments, by introducing lambdas
+-- should be idempotent!!!
 lambdas :: Core -> SS Core
-lambdas c = descendExprM f c
+lambdas c = applyBodyCoreM f c
     where
         arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
 
-        f (CoreApp (CoreFun x) xs)
-                | extra <= 0 = return $ coreApp (CoreFun x) xs
-                | otherwise = do
-                    vs <- getVars (arr x)
-                    return $ coreApp (coreLam vs (coreApp (CoreFun x) (map CoreVar vs))) xs
-            where extra = arr x - length xs
-        
+        f o@(CoreApp (CoreFun x) xs) = do
+            xs <- mapM f xs
+            let extra = arr x - length xs
+            if extra <= 0 then return $ coreApp (CoreFun x) xs else do
+                vs <- getVars (arr x)
+                return $ coreApp (coreLam vs (coreApp (CoreFun x) (map CoreVar vs))) xs
+
         f (CoreFun x) = f $ CoreApp (CoreFun x) []
         f x = descendM f x
+
+
+applyBodyCoreM f c = do
+    res <- mapM g (coreFuncs c)
+    return $ c{coreFuncs = res}
+    where
+        g (CoreFunc a b c) = liftM (CoreFunc a b) $ f c
+        g x = return x
 
 
 -- perform basic simplification to remove lambda's
 -- basic idea is to lift lambda's outwards to the top
 simplify :: Core -> SS Core
-simplify = return . applyFuncCore g . transformExpr f
+simplify c = return . applyFuncCore g =<< transformExprM f c
     where
         g (CoreFunc name args (CoreLam vars body)) = CoreFunc name (args++vars) body
         g x = x
 
-        f (CoreApp (CoreLam vs x) ys) = coreApp (coreLam vs2 x2) ys2
+        f (CoreApp (CoreLam vs x) ys) = return $ coreApp (coreLam vs2 x2) ys2
             where
                 i = min (length vs) (length ys)
                 (vs1,vs2) = splitAt i vs
@@ -92,7 +119,15 @@ simplify = return . applyFuncCore g . transformExpr f
                 (rep,bind) = partition (\(a,b) -> isCoreVar b || countFreeVar a x <= 1) (zip vs1 ys1)
                 x2 = coreLet bind $ replaceFreeVars rep x
 
-        f x = x
+        f (CoreCase on alts) | not $ null ar = do
+                vs <- getVars $ maximum ar
+                transformExprM f $ CoreLam vs $ CoreCase on
+                    [(a, CoreApp b (map CoreVar vs)) | (a,b) <- alts]
+            where
+                ar = [length vs | (_, CoreLam vs x) <- alts]
+
+        f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
+        f x = return x
 
 
 -- BEFORE: box = [even]
@@ -100,10 +135,9 @@ simplify = return . applyFuncCore g . transformExpr f
 inline :: Core -> SS Core
 inline c = do
     s <- get
-    let arr = arities c
-        done = inlined s
+    let done = inlined s
         todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
-                            , name `Set.notMember` done, boxedFun arr body]
+                            , name `Set.notMember` done, shouldInline body]
     if Map.null todo then return c else 
         logger ("Inlining: " ++ show (Map.keys todo)) $ do
             modify $ \s -> s{inlined = Set.fromList (Map.keys todo) `Set.union` done}
@@ -116,39 +150,13 @@ inline c = do
                                     return y
         f mp x = return x
 
+        shouldInline (CoreApp (CoreCon x) xs) = any shouldInline xs
+        shouldInline (CoreLam _ _) = True
+        shouldInline _ = False
+
 
 
 -- BEFORE: map even x
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
 specialise c = return c
-
-
-
-arities :: Core -> (CoreFuncName -> Int)
-arities c = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
-
-
-arity :: (CoreFuncName -> Int) -> CoreExpr -> Int
-arity ask = f
-    where
-        nat = max 0
-
-        f (CoreLam vs x) = length vs + f x
-        f (CoreApp x xs) = nat (f x - length xs)
-        f (CoreFun x) = ask x
-        f (CoreCase _ alts) = maximum $ map (f . snd) alts
-        f (CoreLet _ x) = f x
-        f (CorePos _ x) = f x
-        f _ = 0
-
--- is there a function, possibly hiding within a constructor
-boxedFun :: (CoreFuncName -> Int) -> CoreExpr -> Bool
-boxedFun ask = f
-    where
-        f (CoreLam vs x) = True
-        f (CoreApp (CoreCon x) xs) = any f xs
-        f (CoreCase _ alts) = any (f . snd) alts
-        f (CoreLet _ x) = f x
-        f (CorePos _ x) = f x
-        f x = arity ask x > 0
