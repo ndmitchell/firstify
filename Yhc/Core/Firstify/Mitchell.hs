@@ -77,8 +77,15 @@ checkConfluent name f x = do
         else diagnose name x2 x3
 
 
+applyBodyCoreM f c = do
+    res <- mapM g (coreFuncs c)
+    return $ c{coreFuncs = res}
+    where
+        g (CoreFunc a b c) = liftM (CoreFunc a b) $ f c
+        g x = return x
+
+
 -- make sure every function is given enough arguments, by introducing lambdas
--- should be idempotent!!!
 lambdas :: Core -> SS Core
 lambdas c = applyBodyCoreM f c
     where
@@ -93,14 +100,6 @@ lambdas c = applyBodyCoreM f c
 
         f (CoreFun x) = f $ CoreApp (CoreFun x) []
         f x = descendM f x
-
-
-applyBodyCoreM f c = do
-    res <- mapM g (coreFuncs c)
-    return $ c{coreFuncs = res}
-    where
-        g (CoreFunc a b c) = liftM (CoreFunc a b) $ f c
-        g x = return x
 
 
 -- perform basic simplification to remove lambda's
