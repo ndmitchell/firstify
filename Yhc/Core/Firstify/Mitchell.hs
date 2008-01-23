@@ -53,14 +53,15 @@ fixM f x = do
 --
 -- Then specialise each value
 step :: Core -> SS Core
-step = ("lambdas",lambdas) * ("simplify",simplify) -- * inline
+step = f acts
     where
-        -- assume 'a' finds a fixed point on its own
-        (*) a b x = do
-            let ap (name,func) x = trace name $ checkConfluent name func x
-            x2 <- ap a x
-            x3 <- ap b x2
-            if x3 == x2 then return x2 else (*) a b x3
+        (*) = (,)
+        acts = ["lambdas" * lambdas, "simplify" * simplify, "inline" * inline]
+
+        f [] x = return x
+        f ((name,act):ys) x = do
+            x2 <- trace name $ act x
+            if x == x2 then f ys x else f acts x2
 
 
 diagnose msg a b = head [error $ msg ++ ":\n" ++ show c ++ "\n======\n" ++ show d
