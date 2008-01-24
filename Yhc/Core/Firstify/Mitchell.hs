@@ -22,7 +22,8 @@ type SS a = State S a
 
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
            ,specialised :: H.Homeomorphic CoreExpr1 () -- which have been specialised (termination check)
-           ,special :: Map.Map CoreExpr CoreFuncName -- which special variants do we have (CoreVar "" is wildcard)
+           ,special1 :: Map.Map CoreExpr CoreFuncName -- which special variants do we have
+           ,special2 :: Map.Map CoreFuncName CoreExpr -- reverse map of special1
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
            }
@@ -163,11 +164,27 @@ inline c = do
 specialise :: Core -> SS Core
 specialise = transformExprM f
     where
-        f x | t /= templateNone = error $ show x ++ "\n\n" ++ show t
-            where
-                t = template x
+        f x | t /= templateNone = do
+                s <- get
+                let th = templateExpand (special2 s) t
+                    holes = templateHoles x t
+                case Map.lookup t (special1 s) of
+                    Just y -> coreApp (CoreFun y) holes
+                    _ | isJust $ H.check th (specialised s) = return x
+                    _ -> do
+                        let name = joinName (funcId s) (templateName t)
+                        put s{specialised = H.add th (specialised s)
+                             ,funcId = funcId s + 1
+                             ,special1 = Map.insert t name (special1 s)
+                             ,special2 = Map.insert t name (special2 s)
+                             }
+                        coreApp (CoreFun name) holes
+            where t = templateCreate x
+
         f x = return x
 
+
+put_ x = put x >> return x
 
 
 templateNone = CoreVar "_"
@@ -175,8 +192,8 @@ templateNone = CoreVar "_"
 
 -- assume template is called in a bottom-up manner, so
 -- can ignore the effect of multiple templatings
-template :: CoreExpr -> CoreExpr
-template o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
+templateCreate :: CoreExpr -> CoreExpr
+templateCreate o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         uniqueBoundVars $ join (CoreApp (CoreFun x)) (map f xs)
     where
         free = collectFreeVars o
@@ -189,4 +206,4 @@ template o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         join g xs | any (/= templateNone) xs = g xs
                   | otherwise = templateNone
 
-template _ = templateNone
+templateCreate _ = templateNone
