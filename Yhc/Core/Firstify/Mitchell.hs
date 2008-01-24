@@ -137,17 +137,19 @@ inline c = do
     s <- get
     let done = inlined s
         todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
-                            , name `Set.notMember` done, shouldInline body]
+                            ,let b = name `Set.notMember` done, shouldInline body
+                            ,if b then True else trace ("Skipped inlining of: " ++ name) False]
     if Map.null todo then return c else 
         logger ("Inlining: " ++ show (Map.keys todo)) $ do
             modify $ \s -> s{inlined = Set.fromList (Map.keys todo) `Set.union` done}
-            transformExprM (f (`Map.lookup` todo)) c
+            res <- transformExprM (f todo) c
+            return $ coreReachable ["main"] res
     where
-        f mp (CoreFun x) = case mp x of
+        f mp (CoreFun x) = case Map.lookup x mp of
                                 Nothing -> return $ CoreFun x
                                 Just y -> do
                                     y <- duplicateExpr y
-                                    return y
+                                    transformM (f (Map.delete x mp)) y
         f mp x = return x
 
         shouldInline (CoreApp (CoreCon x) xs) = any shouldInline xs
