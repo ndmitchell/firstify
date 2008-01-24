@@ -1,7 +1,7 @@
 
 module Yhc.Core.Firstify.Mitchell(mitchell) where
 
-import Yhc.Core hiding (uniqueBoundVarsCore)
+import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
 
@@ -162,3 +162,26 @@ inline c = do
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
 specialise c = return c
+
+
+
+
+templateNone = CoreVar "_"
+
+
+-- assume template is called in a bottom-up manner, so
+-- can ignore the effect of multiple templatings
+template :: CoreExpr -> CoreExpr
+template o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
+        uniqueBoundVars $ join (CoreApp (CoreFun x)) (map f xs)
+    where
+        free = collectFreeVars o
+        f (CoreLam vs x) = CoreLam vs (f x)
+        f (CoreVar x) = if x `elem` free then templateNone else CoreVar x
+        f x = join generate (map f children)
+            where (children,generate) = uniplate x
+
+        join g xs | any (/= templateNone) xs = g xs
+                  | otherwise = templateNone
+
+template _ = templateNone
