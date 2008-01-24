@@ -56,7 +56,7 @@ step :: Core -> SS Core
 step = f acts
     where
         (*) = (,)
-        acts = ["lambdas" * lambdas, "simplify" * simplify, "inline" * inline]
+        acts = ["lambdas" * lambdas, "simplify" * simplify, "inline" * inline, "specialise" * specialise]
 
         f [] x = return x
         f ((name,act):ys) x = do
@@ -161,8 +161,12 @@ inline c = do
 -- BEFORE: map even x
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
-specialise c = return c
-
+specialise = transformExprM f
+    where
+        f x | t /= templateNone = error $ show x ++ "\n\n" ++ show t
+            where
+                t = template x
+        f x = return x
 
 
 
@@ -178,6 +182,7 @@ template o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         free = collectFreeVars o
         f (CoreLam vs x) = CoreLam vs (f x)
         f (CoreVar x) = if x `elem` free then templateNone else CoreVar x
+        f (CoreApp x xs) | isCoreCon x || isCoreFun x = join (CoreApp x) (map f xs)
         f x = join generate (map f children)
             where (children,generate) = uniplate x
 
