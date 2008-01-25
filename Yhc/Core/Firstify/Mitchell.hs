@@ -242,8 +242,9 @@ templateCreate _ = templateNone
 
 -- pick a human readable name for a template result
 templateName :: Template -> String
-templateName (CoreApp (CoreFun name) xs) = concat $ intersperse "_" $ name :
+templateName (CoreApp (CoreFun name) xs) = concat $ intersperse "_" $ map short $ name :
     [x | CoreFun x <- map (fst . fromCoreApp . snd . fromCoreLam) xs, '_' `notElem` x]
+    where short = reverse . takeWhile (/= ';') . reverse
 templateName _ = "template"
 
 
