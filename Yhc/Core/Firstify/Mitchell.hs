@@ -145,6 +145,7 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
                 g (PatCon c vs, y) = [coreLet (zip vs xs) y | c == x]
                 g _ = []
 
+        f (CoreLet bind (CoreLam vs x)) = return $ CoreLam vs (CoreLet bind x)
 
         f x = return x
 
