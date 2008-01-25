@@ -5,13 +5,16 @@ import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
 
+import Control.Exception
 import Control.Monad
 import Control.Monad.State
 import qualified Data.Homeomorphic as H
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.List
+import Data.Maybe
 import Debug.Trace
+import Safe
 
 
 logger :: String -> SS a -> SS a
@@ -33,13 +36,16 @@ instance UniqueId S where
     getId = varId
     putId x s = s{varId = x}
 
+instance UniqueId b => UniqueId (a,b) where
+    getId (a,b) = getId b
+    putId x (a,b) = (a, putId x b)
 
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = evalState (step =<< uniqueBoundVarsCore c2) s0
+mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
     where
-        s0 = S Set.empty H.empty Map.empty 0 (uniqueFuncsNext c2)
+        s0 = S Set.empty H.empty Map.empty Map.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -162,37 +168,50 @@ inline c = do
 -- BEFORE: map even x
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
-specialise = transformExprM f
+specialise c = do
+        s <- get
+        (c,s) <- return $ execState (transformExprM f c) (c,s)
+        put s
+        return c
     where
         f x | t /= templateNone = do
-                s <- get
-                let th = templateExpand (special2 s) t
+                (c,s) <- get
+                let th = shellify $ blurVar $ templateExpand (special2 s) t
                     holes = templateHoles x t
                 case Map.lookup t (special1 s) of
-                    Just y -> coreApp (CoreFun y) holes
-                    _ | isJust $ H.check th (specialised s) = return x
+                    Just y -> return $ coreApp (CoreFun y) holes
+                    _ | isJust $ H.findOne th (specialised s) ->
+                        trace ("Skipping specialisation of: " ++ show t) $ return x
                     _ -> do
-                        let name = joinName (funcId s) (templateName t)
-                        put s{specialised = H.add th (specialised s)
-                             ,funcId = funcId s + 1
-                             ,special1 = Map.insert t name (special1 s)
-                             ,special2 = Map.insert t name (special2 s)
-                             }
-                        coreApp (CoreFun name) holes
+                        let name = uniqueJoin (templateName t) (funcId s)
+                        fun <- templateGenerate c name t
+                        put (c{coreFuncs = fun : coreFuncs c},
+                             s{specialised = H.insert th () (specialised s)
+                              ,funcId = funcId s + 1
+                              ,special1 = Map.insert t name (special1 s)
+                              ,special2 = Map.insert name t (special2 s)
+                              })
+                        return $ coreApp (CoreFun name) holes
             where t = templateCreate x
 
         f x = return x
 
 
-put_ x = put x >> return x
 
+---------------------------------------------------------------------
+-- TEMPLATE STUFF
 
+-- all templates must be at least: CoreApp (CoreFun _) _
+type Template = CoreExpr
+
+templateNone :: Template
 templateNone = CoreVar "_"
 
 
+-- given an expression, what would be the matching template
 -- assume template is called in a bottom-up manner, so
 -- can ignore the effect of multiple templatings
-templateCreate :: CoreExpr -> CoreExpr
+templateCreate :: CoreExpr -> Template
 templateCreate o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         uniqueBoundVars $ join (CoreApp (CoreFun x)) (map f xs)
     where
@@ -207,3 +226,67 @@ templateCreate o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
                   | otherwise = templateNone
 
 templateCreate _ = templateNone
+
+
+-- pick a human readable name for a template result
+templateName :: Template -> String
+templateName (CoreApp (CoreFun name) xs) = concat $ intersperse "_" $ name :
+    [x | CoreFun x <- map (fst . fromCoreApp . snd . fromCoreLam) xs, '_' `notElem` x]
+templateName _ = "template"
+
+
+-- for each CoreVar "_", get the associated expression
+templateHoles :: CoreExpr -> Template -> [CoreExpr]
+templateHoles x y | y == templateNone = [x]
+                  | otherwise = concat $ zipWith templateHoles (children x) (children y)
+
+
+templateExpand :: Map.Map CoreFuncName Template -> Template -> Template
+templateExpand mp = transform f
+    where
+        f (CoreFun x) = case Map.lookup x mp of
+                            Just y -> transform f y
+                            Nothing -> CoreFun x
+        f x = x
+
+
+templateGenerate :: UniqueIdM m => Core -> CoreFuncName -> Template -> m CoreFunc
+templateGenerate c newname (CoreApp (CoreFun name) xs) = do
+    let CoreFunc _ args body = coreFunc c name
+    x <- duplicateExpr $ coreLam args body
+    count1 <- getIdM
+    xs <- mapM (transformM f) xs
+    count2 <- getIdM
+    putIdM count1
+    vs <- getVars (count2-count1)
+    return $ CoreFunc newname vs (coreApp x xs)
+    where
+        f x | x == templateNone = liftM CoreVar getVar
+        f x = return x
+
+
+
+---------------------------------------------------------------------
+-- UTILITIES
+
+
+put_ x = put x >> return x
+
+
+shellify :: CoreExpr -> H.Shell CoreExpr1
+shellify x = H.shell (coreExpr1 x) (map shellify $ children x)
+
+
+-- need to blur all uses and definitions
+blurVar :: CoreExpr -> CoreExpr
+blurVar = transform f
+    where
+        f (CoreVar _) = CoreVar ""
+        f (CoreLet bind x) = CoreLet (map ((,) "" . snd) bind) x
+        f (CoreCase on alts) = CoreCase on [(g a,b) | (a,b) <- alts]
+        f (CoreLam x y) = CoreLam (map (const "") x) y
+        f x = x
+
+        g (PatCon x _) = PatCon x []
+        g x = x
+
