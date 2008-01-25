@@ -95,8 +95,9 @@ applyBodyCoreM f c = do
 
 -- make sure every function is given enough arguments, by introducing lambdas
 lambdas :: Core -> SS Core
-lambdas c = applyBodyCoreM f c
+lambdas c2 = applyBodyCoreM f c
     where
+        c = coreReachable ["main"] c2
         arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
 
         f o@(CoreApp (CoreFun x) xs) = do
@@ -149,8 +150,7 @@ inline c = do
     if Map.null todo then return c else 
         logger ("Inlining: " ++ show (Map.keys todo)) $ do
             modify $ \s -> s{inlined = Set.fromList (Map.keys todo) `Set.union` done}
-            res <- transformExprM (f todo) c
-            return $ coreReachable ["main"] res
+            transformExprM (f todo) c
     where
         f mp (CoreFun x) = case Map.lookup x mp of
                                 Nothing -> return $ CoreFun x
