@@ -145,6 +145,14 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
                                     Just y -> duplicateExpr y
                 g x = return x
 
+        f (CoreCase on@(CoreApp (CoreCon x) xs) alts) | any isCoreLam $ universe on =
+                transformM f $ head $ concatMap g alts
+            where
+                g (PatDefault, y) = [y]
+                g (PatCon c vs, y) = [coreLet (zip vs xs) y | c == x]
+                g _ = []
+
+
         f x = return x
 
 
