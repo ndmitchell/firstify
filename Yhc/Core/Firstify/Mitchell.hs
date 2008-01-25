@@ -135,6 +135,16 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
                 ar = [length vs | (_, CoreLam vs x) <- alts]
 
         f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
+
+        f (CoreLet bind x) | not $ null bad = transformM g x
+            where
+                (bad,good) = partition (any isCoreLam . universe . snd) bind
+
+                g (CoreVar x) = case lookup x bad of
+                                    Nothing -> return $ CoreVar x
+                                    Just y -> duplicateExpr y
+                g x = return x
+
         f x = return x
 
 
