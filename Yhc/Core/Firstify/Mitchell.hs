@@ -26,7 +26,7 @@ type SS a = State S a
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
            ,specialised :: Map.Map CoreFuncName (H.Homeomorphic CoreExpr1 CoreExpr)
                 -- ^ which have been specialised within each function (termination check)
-           ,special1 :: Map.Map CoreExpr CoreFuncName -- which special variants do we have
+           ,special1 :: Map.Map CoreExpr CoreFunc -- which special variants do we have
            ,special2 :: Map.Map CoreFuncName CoreExpr -- reverse map of special1
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
@@ -200,17 +200,24 @@ specialise c = do
                     holes = templateHoles x t
                     prev = H.findOne th homeo
                 case Map.lookup t (special1 s) of
-                    Just y -> return $ coreApp (CoreFun y) holes
-                    _ | isJust prev ->
+                    -- OPTION 1: Not previously done, and a homeomorphic embedding
+                    Nothing | isJust prev ->
                         trace ("Skipped specialisation of: " ++ show (templateExpand (special2 s) t) ++
                                "\nBecause of: " ++ show prev) $ return x
+                    -- OPTION 2: Previously done
+                    Just now@(CoreFunc name _ _) -> do
+                        when (isNothing (coreFuncMaybe c name) &&
+                              name `notElem` map coreFuncName new) $
+                            put (now:new, s)
+                        return $ coreApp (CoreFun name) holes
+                    -- OPTION 3: New todo
                     _ -> do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c name t
                         put (fun : new,
                              s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
                               ,funcId = funcId s + 1
-                              ,special1 = Map.insert t name (special1 s)
+                              ,special1 = Map.insert t fun (special1 s)
                               ,special2 = Map.insert name t (special2 s)
                               })
                         return $ coreApp (CoreFun name) holes
