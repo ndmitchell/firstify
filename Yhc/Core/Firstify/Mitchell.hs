@@ -254,6 +254,7 @@ templateGenerate :: UniqueIdM m => Core -> CoreFuncName -> Template -> m CoreFun
 templateGenerate c newname (CoreApp (CoreFun name) xs) = do
     let CoreFunc _ args body = coreFunc c name
     x <- duplicateExpr $ coreLam args body
+    xs <- mapM duplicateExpr xs
     count1 <- getIdM
     xs <- mapM (transformM f) xs
     count2 <- getIdM
