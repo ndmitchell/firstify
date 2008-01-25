@@ -24,7 +24,8 @@ logger x = id
 type SS a = State S a
 
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
-           ,specialised :: H.Homeomorphic CoreExpr1 () -- which have been specialised (termination check)
+           ,specialised :: Map.Map CoreFuncName (H.Homeomorphic CoreExpr1 CoreExpr)
+                -- ^ which have been specialised within each function (termination check)
            ,special1 :: Map.Map CoreExpr CoreFuncName -- which special variants do we have
            ,special2 :: Map.Map CoreFuncName CoreExpr -- reverse map of special1
            ,varId :: Int -- what is the next variable id to use
@@ -45,7 +46,7 @@ instance UniqueId b => UniqueId (a,b) where
 mitchell :: Core -> Core
 mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
     where
-        s0 = S Set.empty H.empty Map.empty Map.empty 0 (uniqueFuncsNext c2)
+        s0 = S Set.empty Map.empty Map.empty Map.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -182,23 +183,32 @@ specialise c = do
         s <- get
         -- new state is a tuple where the first element is a list of new functions
         -- and the second is the existing state
-        (c,(new,s)) <- return $ runState (transformExprM f c) ([],s)
+        (c,(new,s)) <- return $ runState (applyFuncCoreM f c) ([],s)
         put s
         return c{coreFuncs = new ++ coreFuncs c}
     where
-        f x | t /= templateNone = do
+        f (CoreFunc name args x) = do
+            (_,s) <- get
+            let homeo = Map.findWithDefault H.empty name (specialised s)
+            x <- transformM (g homeo) x
+            return $ CoreFunc name args x
+        f x = return x
+
+        g homeo x | t /= templateNone = do
                 (new,s) <- get
                 let th = shellify $ blurVar $ templateExpand (special2 s) t
                     holes = templateHoles x t
+                    prev = H.findOne th homeo
                 case Map.lookup t (special1 s) of
                     Just y -> return $ coreApp (CoreFun y) holes
-                    _ | isJust $ H.findOne th (specialised s) ->
-                        trace ("Skipping specialisation of: " ++ show t) $ return x
+                    _ | isJust prev ->
+                        trace ("Skipped specialisation of: " ++ show (templateExpand (special2 s) t) ++
+                               "\nBecause of: " ++ show prev) $ return x
                     _ -> do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c name t
                         put (fun : new,
-                             s{specialised = H.insert th () (specialised s)
+                             s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
                               ,funcId = funcId s + 1
                               ,special1 = Map.insert t name (special1 s)
                               ,special2 = Map.insert name t (special2 s)
@@ -206,7 +216,7 @@ specialise c = do
                         return $ coreApp (CoreFun name) holes
             where t = templateCreate x
 
-        f x = return x
+        g homeo x = return x
 
 
 
