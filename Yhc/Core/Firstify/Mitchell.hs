@@ -306,10 +306,13 @@ blurVar = transform f
 
 
 applyBodyCoreM :: Monad m => (CoreExpr -> m CoreExpr) -> Core -> m Core
-applyBodyCoreM f c = do
-    res <- mapM g (coreFuncs c)
-    return $ c{coreFuncs = res}
+applyBodyCoreM f = applyFuncCoreM g
     where
         g (CoreFunc a b c) = liftM (CoreFunc a b) $ f c
         g x = return x
 
+
+applyFuncCoreM :: Monad m => (CoreFunc -> m CoreFunc) -> Core -> m Core
+applyFuncCoreM f c = do
+    res <- mapM f (coreFuncs c)
+    return $ c{coreFuncs = res}
