@@ -180,12 +180,14 @@ inline c = do
 specialise :: Core -> SS Core
 specialise c = do
         s <- get
-        (c,s) <- return $ execState (transformExprM f c) (c,s)
+        -- new state is a tuple where the first element is a list of new functions
+        -- and the second is the existing state
+        (c,(new,s)) <- return $ runState (transformExprM f c) ([],s)
         put s
-        return c
+        return c{coreFuncs = new ++ coreFuncs c}
     where
         f x | t /= templateNone = do
-                (c,s) <- get
+                (new,s) <- get
                 let th = shellify $ blurVar $ templateExpand (special2 s) t
                     holes = templateHoles x t
                 case Map.lookup t (special1 s) of
@@ -195,7 +197,7 @@ specialise c = do
                     _ -> do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c name t
-                        put (c{coreFuncs = fun : coreFuncs c},
+                        put (fun : new,
                              s{specialised = H.insert th () (specialised s)
                               ,funcId = funcId s + 1
                               ,special1 = Map.insert t name (special1 s)
