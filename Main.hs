@@ -68,9 +68,10 @@ main = do
 
     when (Stats `elem` acts && Reynolds `elem` acts) $ showStats c
 
+    let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts]
     out <- case [o | Output o <- acts] of
                o:_ -> return o
-               _ -> findOutput $ head files
+               _ -> findOutput (if null ext then "none" else ext) $ head files
     
     putStrLn "Writing result"
     saveCore out c
@@ -79,7 +80,7 @@ main = do
 
 
 -- figure out where a file should go if we don't get an output location
-findOutput s = return $ replaceBaseName s (takeBaseName s <.> "1st")
+findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
 
 
 -- statistics:
