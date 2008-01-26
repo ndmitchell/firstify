@@ -199,10 +199,10 @@ specialise c = do
                 (new,s) <- get
                 let th = shellify $ blurVar $ templateExpand (special2 s) t
                     holes = templateHoles x t
-                    prev = H.findOne th homeo
+                    prev = H.find th homeo
                 case Map.lookup t (special1 s) of
                     -- OPTION 1: Not previously done, and a homeomorphic embedding
-                    Nothing | isJust prev ->
+                    Nothing | length prev > 2 ->
                         trace ("Skipped specialisation of: " ++ show (templateExpand (special2 s) t) ++
                                "\nBecause of: " ++ show prev) $ return x
                     -- OPTION 2: Previously done
