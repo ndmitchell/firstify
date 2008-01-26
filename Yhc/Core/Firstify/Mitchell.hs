@@ -88,7 +88,7 @@ checkConfluent name f x = do
 
 -- make sure every function is given enough arguments, by introducing lambdas
 lambdas :: Core -> SS Core
-lambdas c2 = applyBodyCoreM f c
+lambdas c2 | checkFreeVarCore c2 = applyBodyCoreM f c
     where
         c = coreReachable ["main"] c2
         arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
@@ -334,3 +334,18 @@ applyFuncCoreM :: Monad m => (CoreFunc -> m CoreFunc) -> Core -> m Core
 applyFuncCoreM f c = do
     res <- mapM f (coreFuncs c)
     return $ c{coreFuncs = res}
+
+
+checkFreeVarCore :: Core -> Bool
+checkFreeVarCore c = all f (coreFuncs c) && disjoint vars
+    where
+        vars = concat [v ++ collectBoundVars x | CoreFunc _ v x <- coreFuncs c]
+
+        f func@(CoreFunc _ args x) =
+            if null (collectFreeVars x \\ args) then True
+            else error $ "checkFreeVarCore: " ++ show func
+        f x = True
+
+
+        disjoint x = if null res then True else error $ "not disjoint: " ++ show res
+            where res = filter (not . null) . map tail . group . sort $ x
