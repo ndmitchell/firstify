@@ -215,7 +215,7 @@ specialise c = do
                     _ -> do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c name t
-                        put (fun : new,
+                        modify $ \(new,s) -> (fun : new,
                              s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
                               ,funcId = funcId s + 1
                               ,special1 = Map.insert t fun (special1 s)
