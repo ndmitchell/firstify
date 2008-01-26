@@ -32,4 +32,11 @@ main x = even (x :: Int)
 main x = show (x :: Int)
 -}
 
+{-
 main = show [()]
+-}
+
+
+data Wrap a = Wrap (Wrap a) | Value a
+f a = Wrap a
+main = f (Value id)
