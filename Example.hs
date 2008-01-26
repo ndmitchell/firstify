@@ -24,8 +24,12 @@ b x = x*(4::Int)
 c x = x-(3::Int)
 -}
 
+{-
 main x = even (x :: Int)
+-}
 
+{-
+main x = show (x :: Int)
+-}
 
-
-
+main = show [()]
