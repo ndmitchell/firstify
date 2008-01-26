@@ -36,7 +36,11 @@ main x = show (x :: Int)
 main = show [()]
 -}
 
-
+{-
+-- NOTE: Cannot be firstified
 data Wrap a = Wrap (Wrap a) | Value a
 f a = Wrap a
 main = f (Value id)
+-}
+
+main = putChar 'x'
