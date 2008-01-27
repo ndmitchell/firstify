@@ -110,7 +110,7 @@ showStats verbose c = putStr $ unlines
         ,"Under-Sat calls: " ++ show2 under
         ,"Under-Sat funs : " ++ show3 under
         ,"Over -Sat calls: " ++ show2 over
-        ,"Over -Sat funs : " ++ show3 under
+        ,"Over -Sat funs : " ++ show3 over
         ]
     where
         -- PREPARTION
