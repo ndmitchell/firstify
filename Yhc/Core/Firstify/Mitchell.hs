@@ -116,7 +116,9 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
         g (CoreFunc name args (CoreLam vars body)) = CoreFunc name (args++vars) body
         g x = x
 
-        f (CoreApp (CoreLam vs x) ys) = return $ coreApp (coreLam vs2 x2) ys2
+        f (CoreApp (CoreLam vs x) ys) = do
+                x2 <- transformExprM f x2
+                return $ coreApp (coreLam vs2 x2) ys2
             where
                 i = min (length vs) (length ys)
                 (vs1,vs2) = splitAt i vs
@@ -133,7 +135,7 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
 
         f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
 
-        f (CoreLet bind x) | not $ null bad = transformM g x
+        f (CoreLet bind x) | not $ null bad = transformM f =<< transformM g x
             where
                 (bad,good) = partition (any isCoreLam . universe . snd) bind
 
