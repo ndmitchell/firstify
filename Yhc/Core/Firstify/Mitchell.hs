@@ -135,7 +135,10 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
 
         f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
 
-        f (CoreLet bind x) | not $ null bad = transformM f =<< transformM g x
+        f (CoreLet bind x) | not $ null bad = do
+                x <- transformM g x
+                x <- transformM f x
+                return $ coreLet good x
             where
                 (bad,good) = partition (any isCoreLam . universe . snd) bind
 
