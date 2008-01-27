@@ -54,19 +54,19 @@ main = do
 
     c <- loadCore $ head files
     
-    when (Stats `elem` acts) $ showStats c
+    let stats c = do
+        when (Stats `elem` acts) $
+            showStats c
+        return c
+    stats c
 
     c <- if Mitchell `notElem` acts then return c else do
         putStrLn "Performing Mitchell firstification"
-        return $ mitchell c
-
-    when (Stats `elem` acts && Mitchell `elem` acts) $ showStats c
+        stats $ mitchell c
 
     c <- if Reynolds `notElem` acts then return c else do
         putStrLn "Performing Reynold's firstification"
-        return $ reynolds c
-
-    when (Stats `elem` acts && Reynolds `elem` acts) $ showStats c
+        stats $ reynolds c
 
     let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts]
     out <- case [o | Output o <- acts] of
