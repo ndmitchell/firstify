@@ -15,7 +15,7 @@ import qualified Data.Set as Set
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
-             | Output String | Text | Html
+             | Output String | Text | Html | Verbose
              deriving (Show,Eq)
 
 
@@ -23,6 +23,7 @@ opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
     ,Option "s" ["stats"]    (NoArg Stats   ) "Show additional statistics"
+    ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
     ,Option "o" []     (ReqArg Output "file") "Where to put the output file"
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
     ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
@@ -56,7 +57,7 @@ main = do
     
     let stats c = do
         when (Stats `elem` acts) $
-            showStats c
+            showStats (Verbose `elem` acts) c
         return c
     stats c
 
@@ -87,8 +88,8 @@ findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
 --    how many functions are under/over-staturated when applied
 --        both instances, and how many functions
 --    how many higher-order applications are there
-showStats :: Core -> IO ()
-showStats c = putStr $ unlines
+showStats :: Bool -> Core -> IO ()
+showStats verbose c = putStr $ unlines
         ["Higher-Order Statistics"
         ,"HO Applications: " ++ pad hoApp
         ,"Lambdas        : " ++ pad lamb
