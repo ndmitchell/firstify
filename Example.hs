@@ -43,4 +43,8 @@ f a = Wrap a
 main = f (Value id)
 -}
 
+{-
 main = putChar 'x'
+-}
+
+main = read "1" :: Int
