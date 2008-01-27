@@ -83,7 +83,11 @@ checkConfluent name f x = do
     x3 <- f x2
     if x2 == x3
         then return x2
-        else diagnose name x2 x3
+        else do
+            let badfunc = head $ concat $ zipWith (\c d -> [coreFuncName c | c /= d])
+                                                  (coreFuncs x2) (coreFuncs x3)
+                g x = show (coreFunc x badfunc) ++ "\n======\n"
+            error $ name ++ ":\n" ++ g x ++ g x2 ++ g x3
 
 
 -- make sure every function is given enough arguments, by introducing lambdas
