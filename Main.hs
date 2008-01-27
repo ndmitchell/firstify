@@ -12,7 +12,6 @@ import System.FilePath
 import Yhc.Core
 import Yhc.Core.Firstify
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
