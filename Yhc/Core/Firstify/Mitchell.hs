@@ -288,8 +288,10 @@ templateExpand mp = transform f
 
 
 templateGenerate :: UniqueIdM m => Core -> CoreFuncName -> Template -> m CoreFunc
-templateGenerate c newname (CoreApp (CoreFun name) xs) = do
-    let CoreFunc _ args body = coreFunc c name
+templateGenerate c newname o@(CoreApp (CoreFun name) xs) = do
+    let fun = coreFunc c name
+        CoreFunc _ args body | isCoreFunc fun = fun
+            | otherwise = error $ "Tried specialising on a primitve: " ++ show o
     x <- duplicateExpr $ coreLam args body
     xs <- mapM duplicateExpr xs
     count1 <- getIdM
