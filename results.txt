@@ -1,0 +1,181 @@
+NOTES:
+
+ioSeq is caused by array call within Show Double.
+
+
+bernouilli
+HO Applications:        2
+    LAMBDA27988=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+digits-of-e1
+HO Applications:        2
+    Main;LAMBDA403=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+digits-of-e2
+HO Applications:        2
+    Main;LAMBDA378=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        1
+    Data.Char;showLitChar=1
+Over -Sat funs :        1
+    Prelude;error=1
+
+exp3_8
+HO Applications:        2
+    Main;LAMBDA585=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+gen_regexps
+HO Applications:        0
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+integrate
+HO Applications:        3
+    1801_ioSeq28658=1 Main;LAMBDA470=2
+Lambdas        :        1
+    map_LAMBDA28556=1
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+paraffins
+main: Tried specialising on a primitve: SUB_W
+  (_ (Prelude;(,,,,,,,,)
+        (Prelude;(,,)
+           (Prelude;(,,,,,,,,)
+              (Prelude;(,)
+                 (\v1 v2 -> (Prelude;Prelude.Int;Prelude.Eq;/=) v1 v2)
+                 (\v3 v4 -> (Prelude;Prelude.Int;Prelude.Eq;==) v3 v4))
+              (Prelude;(,,,)
+                 (\v5 v6 v7 -> Prelude;Prelude.Int;Prelude.Show;showsPrec v5 v6
+v7)
+                 (\v8 v9 -> Prelude;Prelude.Int;Prelude.Show;showsType v8 v9)
+                 (\v10 v11 -> Prelude;Prelude.Int;Prelude.Show;showList v10 v11)
+
+                 (\v12 -> Prelude;Prelude.Int;Prelude.Show;show v12))
+              (\v13 v14 -> (Prelude;Prelude.Int;Prelude.Num;*) v13 v14)
+              (\v15 v16 -> (Prelude;Prelude.Int;Prelude.Num;+) v15 v16)
+              (\v17 v18 -> (Prelude;Prelude.Int;Prelude.Num;-) v17 v18)
+              (\v19 -> Prelude;Prelude.Int;Prelude.Num;negate v19)
+              (\v20 -> Prelude;Prelude.Int;Prelude.Num;signum v20)
+              (\v21 -> Prelude;Prelude.Int;Prelude.Num;fromInteger v21)
+              (\v22 -> Prelude;Prelude.Int;Prelude.Num;abs v22))
+           (Prelude;(,,,,,,,)
+              (Prelude;(,)
+                 (\v23 v24 -> (Prelude;Prelude.Int;Prelude.Eq;/=) v23 v24)
+                 (\v25 v26 -> (Prelude;Prelude.Int;Prelude.Eq;==) v25 v26))
+              (\v27 v28 -> (Prelude;Prelude.Int;Prelude.Ord;<) v27 v28)
+              (\v29 v30 -> (Prelude;Prelude.Int;Prelude.Ord;<=) v29 v30)
+              (\v31 v32 -> (Prelude;Prelude.Int;Prelude.Ord;>=) v31 v32)
+              (\v33 v34 -> (Prelude;Prelude.Int;Prelude.Ord;>) v33 v34)
+              (\v35 v36 -> Prelude;Prelude.Int;Prelude.Ord;compare v35 v36)
+              (\v37 v38 -> Prelude;Prelude.Int;Prelude.Ord;min v37 v38)
+              (\v39 v40 -> Prelude;Prelude.Int;Prelude.Ord;max v39 v40))
+           (\v41 -> Prelude;Prelude.Int;Prelude.Real;toRational v41))
+        (Prelude;(,,,,,,,)
+           (\v42 -> Prelude;Prelude.Int;Prelude.Enum;succ v42)
+           (\v43 -> Prelude;Prelude.Int;Prelude.Enum;pred v43)
+           (\v44 -> Prelude;Prelude.Int;Prelude.Enum;enumFrom v44)
+           (\v45 -> Prelude;Prelude.Int;Prelude.Enum;fromEnum v45)
+           (\v46 -> Prelude;Prelude.Int;Prelude.Enum;toEnum v46)
+           (\v47 v48 -> Prelude;Prelude.Int;Prelude.Enum;enumFromThen v47 v48)
+           (\v49 v50 -> Prelude;Prelude.Int;Prelude.Enum;enumFromTo v49 v50)
+           (\v51 v52 v53 -> Prelude;Prelude.Int;Prelude.Enum;enumFromThenTo
+                              v51
+                              v52
+                              v53))
+        (\v54 v55 -> Prelude;Prelude.Int;Prelude.Integral;divMod v54 v55)
+        (\v56 v57 -> Prelude;Prelude.Int;Prelude.Integral;mod v56 v57)
+        (\v58 v59 -> Prelude;Prelude.Int;Prelude.Integral;quotRem v58 v59)
+        (\v60 v61 -> Prelude;Prelude.Int;Prelude.Integral;rem v60 v61)
+        (\v62 -> Prelude;Prelude.Int;Prelude.Integral;toInteger v62)
+        (\v63 v64 -> Prelude;Prelude.Int;Prelude.Integral;quot v63 v64)
+        (\v65 v66 -> Prelude;Prelude.Int;Prelude.Integral;div v65 v66))
+     _)
+  _
+
+primes
+HO Applications:        2
+    Main;LAMBDA284=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+queens
+HO Applications:        2
+    Main;LAMBDA331=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+rfib
+HO Applications:        3
+    1801_ioSeq28689=1 Main;LAMBDA261=2
+Lambdas        :        1
+    map_LAMBDA28567=1
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+tak
+HO Applications:        4
+    Main;LAMBDA268=4
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+wheel-sieve1
+HO Applications:        2
+    Main;LAMBDA481=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+wheel-sieve2
+HO Applications:        2
+    Main;LAMBDA500=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
+x2n1
+HO Applications:        2
+    LAMBDA28014=2
+Lambdas        :        0
+Under-Sat calls:        0
+Under-Sat funs :        0
+Over -Sat calls:        0
+Over -Sat funs :        0
+
