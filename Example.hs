@@ -47,4 +47,9 @@ main = f (Value id)
 main = putChar 'x'
 -}
 
+{-
 main = read "1" :: Int
+-}
+
+import Array
+main = array (0,0) [(0::Int,0::Int)]
