@@ -84,10 +84,24 @@ main = do
 findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
 
 
--- statistics:
---    how many functions are under/over-staturated when applied
---        both instances, and how many functions
---    how many higher-order applications are there
+{- statistics:
+    HO Applications:
+        The number of times you apply arguments to a non
+        function or constructor, i.e. CoreApp v14 [v15]
+        Verbose: which functions they occur within
+    Lambdas:
+        The number of CoreLam expressions
+        Verbose: which functions they occur within
+    Under-Sat calls:
+        The number of applictions without enough arguments, i.e.
+        map f, where f has arity 2
+        Verbose: which functions they occur within
+    Under-Sat funs:
+        The number of functions called without enough arguments
+        i.e. map lacks 1 argument
+        Verbose: which functions they are
+    Over-Sat: reverse of under-sat
+-}
 showStats :: Bool -> Core -> IO ()
 showStats verbose c = putStr $ unlines
         ["Higher-Order Statistics"
