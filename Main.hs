@@ -1,6 +1,7 @@
 
 module Main(main) where
 
+import Control.Arrow
 import Control.Monad
 import Data.List
 import System.Console.GetOpt
@@ -105,14 +106,16 @@ findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
 showStats :: Bool -> Core -> IO ()
 showStats verbose c = putStr $ unlines
         ["Higher-Order Statistics"
-        ,"HO Applications: " ++ pad hoApp
-        ,"Lambdas        : " ++ pad lamb
-        ,"Under-Sat calls: " ++ pad (length under)
-        ,"Under-Sat funs : " ++ pad (g under)
-        ,"Over -Sat calls: " ++ pad (length over)
-        ,"Over -Sat funs : " ++ pad (g over)
+        ,"HO Applications: " ++ show1 hoApp
+        ,"Lambdas        : " ++ show1 lamb
+        ,"Under-Sat calls: " ++ show2 under
+        ,"Under-Sat funs : " ++ show3 under
+        ,"Over -Sat calls: " ++ show2 over
+        ,"Over -Sat funs : " ++ show3 under
         ]
     where
+        -- PREPARTION
+        uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c]
         arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
 
         c2 = transformExpr appRules c
@@ -124,18 +127,34 @@ showStats verbose c = putStr $ unlines
         appRules (CoreApp (CoreApp x y) z) = CoreApp x (y++z)
         appRules x = x
 
-        hoApp = length [() | CoreApp x y <- universeExpr c2, not $ isCoreFun x || isCoreCon x]
-        lamb = length [() | CoreLam _ _ <- universeExpr c2]
 
-        miss = [(x,d==GT)
-               | CoreApp (CoreFun x) args <- universeExpr c2
-               , Just a <- [Map.lookup x arity]
-               , let d = compare (length args) a
-               , d /= EQ]
+        -- FIRST TWO
+        hoApp = [(name,length $ filter isHOApp inner) | (name,inner) <- uni]
+            where
+                isHOApp (CoreApp x y) = not $ isCoreCon x || isCoreFun x
+                isHOApp _ = False
 
-        (over,under) = partition snd miss
+        lamb = [(name, length $ filter isCoreLam inner) | (name,inner) <- uni]
 
-        g = Set.size . Set.fromList . map fst
+        show1 xs = pad (sum $ map snd xs) ++ verb xs
+
+        verb info = if verbose && not (null res) then "\n    " ++ unwords res else ""
+            where res = [a ++ "=" ++ show b | (a,b) <- info, b /= 0]
+
+
+        -- SECOND TWO
+
+        (over,under) = partition fst
+               [(d==GT, (name,fun))
+               | (name,inner) <- uni
+               , CoreApp (CoreFun fun) args <- inner
+               , Just a <- [Map.lookup fun arity]
+               , let d = compare (length args) a, d /= EQ]
+
+        show2 set = pad (length set) ++ show4 fst set
+        show3 set = pad (length . group . sort . map (fst . snd) $ set) ++ show4 snd set
+
+        show4 pick = verb . map (head &&& length) . group . sort . map (pick . snd)
 
         pad x = replicate (8 - length s) ' ' ++ s
             where s = show x
