@@ -133,8 +133,6 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
             where
                 ar = [length vs | (_, CoreLam vs x) <- alts]
 
-        f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
-
         f (CoreLet bind x) | not $ null bad = do
                 x <- transformM g x
                 x <- transformM f x
@@ -154,7 +152,9 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
                 g (PatCon c vs, y) = [coreLet (zip vs xs) y | c == x]
                 g _ = []
 
+        f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
         f (CoreLet bind (CoreLam vs x)) = return $ CoreLam vs (CoreLet bind x)
+        f (CoreApp (CoreApp x y) z) = return $ CoreApp x (y++z)
 
         f x = return x
 
