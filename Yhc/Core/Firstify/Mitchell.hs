@@ -220,7 +220,7 @@ specialise c = do
                     -- OPTION 3: New todo
                     done -> do
                         let name = uniqueJoin (templateName t) (funcId s)
-                        fun <- templateGenerate c name t
+                        fun <- templateGenerate c{coreFuncs=new++coreFuncs c} name t
                         modify $ \(new,s) -> (fun : new,
                              s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
                               ,funcId = funcId s + 1
