@@ -57,7 +57,7 @@ main = do
     
     let stats c = do
         when (Stats `elem` acts) $
-            showStats (Verbose `elem` acts) c
+            putStr $ showStats (Verbose `elem` acts) c
         return c
     stats c
 
@@ -102,8 +102,8 @@ findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
         Verbose: which functions they are
     Over-Sat: reverse of under-sat
 -}
-showStats :: Bool -> Core -> IO ()
-showStats verbose c = putStr $ unlines
+showStats :: Bool -> Core -> String
+showStats verbose c = unlines
         ["Higher-Order Statistics"
         ,"HO Applications: " ++ show1 hoApp
         ,"Lambdas        : " ++ show1 lamb
