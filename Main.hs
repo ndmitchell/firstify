@@ -15,7 +15,7 @@ import qualified Data.Map as Map
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
-             | Output String | Text | Html | Verbose
+             | Output String | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
 
@@ -24,6 +24,7 @@ opts =
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
     ,Option "s" ["stats"]    (NoArg Stats   ) "Show additional statistics"
     ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
+    ,Option "l" ["log"]      (NoArg Log     ) "Log all final results and statistics"
     ,Option "o" []     (ReqArg Output "file") "Where to put the output file"
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
     ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
@@ -55,9 +56,10 @@ main = do
 
     c <- loadCore $ head files
     
-    let stats c = do
+    let verbose = Verbose `elem` acts
+        stats c = do
         when (Stats `elem` acts) $
-            putStr $ showStats (Verbose `elem` acts) c
+            putStr $ showStats verbose c
         return c
     stats c
 
@@ -73,7 +75,10 @@ main = do
     out <- case [o | Output o <- acts] of
                o:_ -> return o
                _ -> findOutput (if null ext then "none" else ext) $ head files
-    
+
+    when (Log `elem` acts) $
+        appendFile "log.txt" $ unlines [unwords args, showStats verbose c]
+
     putStrLn "Writing result"
     saveCore out c
     when (Text `elem` acts) $ writeFile (out <.> "txt") (show c)
