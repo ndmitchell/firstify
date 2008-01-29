@@ -37,3 +37,19 @@ checkFreeVarCore c = all f (coreFuncs c) && disjoint vars
 
         disjoint x = if null res then True else error $ "not disjoint: " ++ show res
             where res = filter (not . null) . map tail . group . sort $ x
+
+
+-- check a function is confluent
+checkConfluent :: Monad m => String -> (Core -> m Core) -> Core -> m Core
+checkConfluent name f x = do
+    x2 <- f x
+    x3 <- f x2
+    if x2 == x3
+        then return x2
+        else do
+            let badfunc = head $ concat $ zipWith (\c d -> [coreFuncName c | c /= d])
+                                                  (coreFuncs x2) (coreFuncs x3)
+                g x = show (coreFunc x badfunc) ++ "\n======\n"
+            error $ name ++ ":\n" ++ g x ++ g x2 ++ g x3
+
+

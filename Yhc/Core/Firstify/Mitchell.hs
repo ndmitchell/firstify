@@ -69,20 +69,6 @@ step = f acts
             if x == x2 then f ys x else f acts x2
 
 
--- check a function is confluent
-checkConfluent :: String -> (Core -> SS Core) -> Core -> SS Core
-checkConfluent name f x = do
-    x2 <- f x
-    x3 <- f x2
-    if x2 == x3
-        then return x2
-        else do
-            let badfunc = head $ concat $ zipWith (\c d -> [coreFuncName c | c /= d])
-                                                  (coreFuncs x2) (coreFuncs x3)
-                g x = show (coreFunc x badfunc) ++ "\n======\n"
-            error $ name ++ ":\n" ++ g x ++ g x2 ++ g x3
-
-
 -- make sure every function is given enough arguments, by introducing lambdas
 lambdas :: Core -> SS Core
 lambdas c2 | checkFreeVarCore c2 = applyBodyCoreM f c
