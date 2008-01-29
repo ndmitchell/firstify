@@ -187,9 +187,10 @@ inline c = do
                                     transformM (f (Map.delete x mp)) y
         f mp x = return x
 
-        shouldInline (CoreApp (CoreCon x) xs) = any shouldInline xs
-        shouldInline (CoreLam _ _) = True
-        shouldInline _ = False
+        -- should inline if there is a lambda before you get to a function
+        shouldInline = any isCoreLam . universe . transform g
+        g (CoreApp (CoreFun x) _) = CoreFun x
+        g x = x
 
 
 
