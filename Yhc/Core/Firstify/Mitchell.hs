@@ -337,19 +337,6 @@ blurVar = transform f
         g x = x
 
 
-applyBodyCoreM :: Monad m => (CoreExpr -> m CoreExpr) -> Core -> m Core
-applyBodyCoreM f = applyFuncCoreM g
-    where
-        g (CoreFunc a b c) = liftM (CoreFunc a b) $ f c
-        g x = return x
-
-
-applyFuncCoreM :: Monad m => (CoreFunc -> m CoreFunc) -> Core -> m Core
-applyFuncCoreM f c = do
-    res <- mapM f (coreFuncs c)
-    return $ c{coreFuncs = res}
-
-
 checkFreeVarCore :: Core -> Bool
 checkFreeVarCore c = all f (coreFuncs c) && disjoint vars
     where
