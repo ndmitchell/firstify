@@ -318,8 +318,6 @@ templateGenerate c newname o@(CoreApp (CoreFun name) xs) = do
 -- UTILITIES
 
 
-put_ x = put x >> return x
-
 
 shellify :: CoreExpr -> H.Shell CoreExpr1
 shellify x = H.shell (coreExpr1 x) (map shellify $ children x)
