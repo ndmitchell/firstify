@@ -2,6 +2,9 @@
 module Example where
 
 
+int0 = 0 :: Int
+int1 = 1 :: Int
+
 {-
 main xs = map head xs
 -}
@@ -51,5 +54,25 @@ main = putChar 'x'
 main = read "1" :: Int
 -}
 
+main = app (gen ())
+app (x,y) = x (y int0)
+gen () = (id,id)
+
+{-
+main xs = app (gen xs)
+
+app [] = []
+app (x:xs) = x (1::Int) : app xs
+
+gen [] = []
+gen (x:xs) = const x : gen xs
+-}
+
+{-
 import Array
 main = array (0,0) [(0::Int,0::Int)]
+-}
+
+{-
+main = show 1 :: Double
+-}
