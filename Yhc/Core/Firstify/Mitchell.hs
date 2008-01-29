@@ -75,10 +75,6 @@ step = f acts
             if x == x2 then f ys x else f acts x2
 
 
-diagnose msg a b = head [error $ msg ++ ":\n" ++ show c ++ "\n======\n" ++ show d
-                        | (c,d) <- zip (coreFuncs a) (coreFuncs b), c /= d]
-
-
 -- check a function is confluent
 checkConfluent :: String -> (Core -> SS Core) -> Core -> SS Core
 checkConfluent name f x = do
