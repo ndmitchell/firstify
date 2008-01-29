@@ -11,6 +11,7 @@ import Control.Monad.State
 import qualified Data.Homeomorphic as H
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Yhc.Core.Firstify.Mitchell.BiMap as BiMap
 import Data.List
 import Data.Maybe
 import Debug.Trace
@@ -26,8 +27,7 @@ type SS a = State S a
 data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
            ,specialised :: Map.Map CoreFuncName (H.Homeomorphic CoreExpr1 CoreExpr)
                 -- ^ which have been specialised within each function (termination check)
-           ,special1 :: Map.Map CoreExpr CoreFuncName -- which special variants do we have
-           ,special2 :: Map.Map CoreFuncName CoreExpr -- reverse map of special1
+           ,special :: BiMap.BiMap CoreFuncName CoreExpr -- which special variants do we have
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
            }
@@ -46,7 +46,7 @@ instance UniqueId b => UniqueId (a,b) where
 mitchell :: Core -> Core
 mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
     where
-        s0 = S Set.empty Map.empty Map.empty Map.empty 0 (uniqueFuncsNext c2)
+        s0 = S Set.empty Map.empty BiMap.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -214,13 +214,14 @@ specialise c = do
 
         g homeo x | t /= templateNone = do
                 (new,s) <- get
-                let th = shellify $ blurVar $ templateExpand (special2 s) t
+                let tfull = templateExpand (`BiMap.lookup` special s) t
+                    th = shellify $ blurVar tfull
                     holes = templateHoles x t
                     prev = H.find th homeo
-                case Map.lookup t (special1 s) of
+                case BiMap.lookupRev t (special s) of
                     -- OPTION 1: Not previously done, and a homeomorphic embedding
                     Nothing | length prev > 2 ->
-                        trace ("Skipped specialisation of: " ++ show (templateExpand (special2 s) t) ++
+                        trace ("Skipped specialisation of: " ++ show tfull ++
                                "\nBecause of: " ++ show prev) $ return x
                     -- OPTION 2: Previously done and not garbage collected
                     Just name | name `elem` map coreFuncName (new ++ coreFuncs c) -> do
@@ -232,8 +233,7 @@ specialise c = do
                         modify $ \(new,s) -> (fun : new,
                              s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
                               ,funcId = funcId s + 1
-                              ,special1 = Map.insert t name (special1 s)
-                              ,special2 = Map.insert name t (special2 s)
+                              ,special = BiMap.insert name t (special s)
                               })
                         return $ coreApp (CoreFun name) holes
             where t = templateCreate x
@@ -286,10 +286,10 @@ templateHoles x y | y == templateNone = [x]
                   | otherwise = concat $ zipWith templateHoles (children x) (children y)
 
 
-templateExpand :: Map.Map CoreFuncName Template -> Template -> Template
+templateExpand :: (CoreFuncName -> Maybe Template) -> Template -> Template
 templateExpand mp = transform f
     where
-        f (CoreFun x) = case Map.lookup x mp of
+        f (CoreFun x) = case mp x of
                             Just y -> transform f y
                             Nothing -> CoreFun x
         f x = x
