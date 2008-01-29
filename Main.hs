@@ -15,7 +15,7 @@ import qualified Data.Map as Map
 
 
 data Actions = Reynolds | Mitchell | Stats | Help
-             | Output String | Text | Html | Verbose | Log
+             | Output String | MainIs CoreFuncName | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
 
@@ -29,6 +29,7 @@ opts =
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
     ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
     ,Option "?" ["help"]     (NoArg Help    ) "Show help message"
+    ,Option ""  ["main"] (ReqArg MainIs "function") "Function to use instead of main"
     ]
 
 pre = unlines 
@@ -55,7 +56,10 @@ main = do
         exitWith (ExitFailure 1)
 
     c <- loadCore $ head files
-    
+
+    let newmain = [name | MainIs name <- acts]
+    c <- return $ if null newmain then c else replaceMain c (head newmain)
+
     let verbose = Verbose `elem` acts
         stats c = do
         when (Stats `elem` acts) $
@@ -87,6 +91,13 @@ main = do
 
 -- figure out where a file should go if we don't get an output location
 findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
+
+
+replaceMain c name = c{coreFuncs = concatMap f $ coreFuncs c}
+    where
+        f x | name `isSuffixOf` n = [x{coreFuncName="main"}]
+            | otherwise = [x | n /= "main"]
+            where n = coreFuncName x
 
 
 {- statistics:
