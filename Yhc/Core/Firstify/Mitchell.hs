@@ -53,12 +53,6 @@ mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
-fixM :: (Eq a, Monad m) => (a -> m a) -> a -> m a
-fixM f x = do
-    x2 <- f x
-    if x == x2 then return x2 else fixM f x2 
-
-
 -- In each step first inline all top-level function bindings
 -- and let's that appear to be bound to an unsaturated
 --
