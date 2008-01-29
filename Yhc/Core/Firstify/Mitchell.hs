@@ -152,6 +152,13 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
                 g (PatCon c vs, y) = [coreLet (zip vs xs) y | c == x]
                 g _ = []
 
+        f (CoreCase (CoreCase on alts1) alts2) | any isCoreLam $ concatMap (universe . snd) alts1 =
+                transformM f =<< liftM (CoreCase on) (mapM g alts1)
+            where
+                g (lhs,rhs) = do
+                    CoreCase _ alts22 <- duplicateExpr $ CoreCase (CoreLit $ CoreInt 0) alts2
+                    return (lhs, CoreCase rhs alts22)
+
         f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
         f (CoreLet bind (CoreLam vs x)) = return $ CoreLam vs (CoreLet bind x)
         f (CoreApp (CoreApp x y) z) = return $ CoreApp x (y++z)
