@@ -7,13 +7,12 @@ import Yhc.Core.UniqueId
 
 import Yhc.Core.Firstify.Mitchell.Util
 import Yhc.Core.Firstify.Mitchell.Template
+import Yhc.Core.Firstify.Mitchell.Terminate
 import qualified Yhc.Core.Firstify.Mitchell.BiMap as BiMap
 
 import Control.Exception
 import Control.Monad
 import Control.Monad.State
-import qualified Data.Homeomorphic as H
-import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.List
 import Data.Maybe
@@ -27,9 +26,7 @@ logger x = id
 
 type SS a = State S a
 
-data S = S {inlined :: Set.Set CoreFuncName  -- which have been inlined (termination check)
-           ,specialised :: Map.Map CoreFuncName (H.Homeomorphic CoreExpr1 CoreExpr)
-                -- ^ which have been specialised within each function (termination check)
+data S = S {terminate :: Terminate -- termination check
            ,special :: BiMap.BiMap CoreFuncName CoreExpr -- which special variants do we have
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
@@ -47,9 +44,9 @@ instance UniqueId b => UniqueId (a,b) where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
+mitchell c = coreReachable ["main"] $ evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
     where
-        s0 = S Set.empty Map.empty BiMap.empty 0 (uniqueFuncsNext c2)
+        s0 = S (emptyTerminate True) BiMap.empty 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -73,7 +70,7 @@ step = f acts
 lambdas :: Core -> SS Core
 lambdas c2 | checkFreeVarCore c2 = applyBodyCoreM f c
     where
-        c = coreReachable ["main"] c2
+        c = c2 -- coreReachable ["main"] c2
         arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
 
         f o@(CoreApp (CoreFun x) xs) = do
@@ -150,21 +147,21 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
 inline :: Core -> SS Core
 inline c = do
     s <- get
-    let done = inlined s
-        todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
-                            ,let b = name `Set.notMember` done, shouldInline body
-                            ,if b then True else trace ("Skipped inlining of: " ++ name) False]
-    if Map.null todo then return c else 
-        logger ("Inlining: " ++ show (Map.keys todo)) $ do
-            modify $ \s -> s{inlined = Set.fromList (Map.keys todo) `Set.union` done}
-            transformExprM (f todo) c
+    let todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
+                            ,shouldInline body]
+    if Map.null todo
+        then return c
+        else applyFuncBodyCoreM (\name -> transformM (f (terminate s) todo name)) c
     where
-        f mp (CoreFun x) = case Map.lookup x mp of
-                                Nothing -> return $ CoreFun x
-                                Just y -> do
-                                    y <- duplicateExpr y
-                                    transformM (f (Map.delete x mp)) y
-        f mp x = return x
+        -- note: deliberately use term from BEFORE this state
+        -- so you keep inlining many times per call
+        f term mp name (CoreFun x)
+            | x `Map.member` mp && askInline term name x
+            = do modify $ \s -> s{terminate = addInline (terminate s) name x}
+                 duplicateExpr $ mp Map.! x
+
+        f term mp name x = return x
+
 
         -- should inline if there is a lambda before you get to a function
         shouldInline = any isCoreLam . universe . transform g
@@ -176,22 +173,14 @@ inline c = do
 -- BEFORE: map even x
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
-specialise c = do
+specialise c = return c {- do
         s <- get
-        -- new state is a tuple where the first element is a list of new functions
-        -- and the second is the existing state
-        (c,(new,s)) <- return $ runState (applyFuncCoreM f c) ([],s)
+        (c,(new,s)) <- return $ flip runState ([],s) $
+            applyFuncBodyCoreM (\name -> transformM (f name)) c
         put s
         return c{coreFuncs = new ++ coreFuncs c}
     where
-        f (CoreFunc name args x) = do
-            (_,s) <- get
-            let homeo = Map.findWithDefault H.empty name (specialised s)
-            x <- transformM (g homeo) x
-            return $ CoreFunc name args x
-        f x = return x
-
-        g homeo x | t /= templateNone = do
+        f name x | t /= templateNone = do
                 (new,s) <- get
                 let tfull = templateExpand (`BiMap.lookup` special s) t
                     th = shellify $ blurVar tfull
@@ -217,4 +206,5 @@ specialise c = do
                         return $ coreApp (CoreFun name) holes
             where t = templateCreate x
 
-        g homeo x = return x
+        f name x = return x
+-}
