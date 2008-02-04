@@ -1,7 +1,8 @@
 
 module Yhc.Core.Firstify.Mitchell.Terminate(
     Terminate, emptyTerminate,
-    addInline, askInline
+    addInline, askInline,
+    addSpec, askSpec, cloneSpec
     ) where
 
 import qualified Data.Homeomorphic as H
@@ -57,7 +58,7 @@ askSpec t within on = logger t ("Skipped spec of: " ++ show on) $
     length (H.find (specKey on) $ specs $ get within t) <= 1
 
 
-cloneSpec :: Terminate -> CoreFuncName -> CoreFuncName -> Terminate
-cloneSpec t from to = case Map.lookup from (terminate t) of
+cloneSpec :: CoreFuncName -> CoreFuncName -> Terminate -> Terminate
+cloneSpec from to t = case Map.lookup from (terminate t) of
                            Nothing -> t
                            Just y -> t{terminate = Map.insert to y{inlined=Set.empty} $ terminate t}
