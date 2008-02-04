@@ -1,6 +1,7 @@
 
 module Yhc.Core.Firstify.Mitchell.Util where
 
+import Control.Monad
 import Data.Homeomorphic
 import Data.List
 import Yhc.Core
@@ -22,6 +23,13 @@ blurVar = transform f
 
         g (PatCon x _) = PatCon x []
         g x = x
+
+
+applyFuncBodyCoreM :: Monad m => (CoreFuncName -> CoreExpr -> m CoreExpr) -> Core -> m Core
+applyFuncBodyCoreM f = applyFuncCoreM g
+    where
+        g (CoreFunc name args body) = liftM (CoreFunc name args) $ f name body
+        g x = return x
 
 
 checkFreeVarCore :: Core -> Bool
