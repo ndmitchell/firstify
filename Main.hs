@@ -93,7 +93,7 @@ main = do
 findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
 
 
-replaceMain c name = c{coreFuncs = concatMap f $ coreFuncs c}
+replaceMain c name = coreReachable ["main"] c{coreFuncs = concatMap f $ coreFuncs c}
     where
         f x | name `isSuffixOf` n = [x{coreFuncName="main"}]
             | otherwise = [x | n /= "main"]
