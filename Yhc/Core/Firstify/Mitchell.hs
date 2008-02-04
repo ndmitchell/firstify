@@ -163,7 +163,9 @@ inline c = do
         f term mp name (CoreFun x)
             | x `Map.member` mp && askInline term name x
             = do modify $ \s -> s{terminate = addInline (terminate s) name x}
-                 duplicateExpr $ mp Map.! x
+                 y <- duplicateExpr $ mp Map.! x
+                 -- try and inline in the context of the person you are grabbing from
+                 transformM (f term (Map.delete x mp) x) y
 
         f term mp name x = return x
 
