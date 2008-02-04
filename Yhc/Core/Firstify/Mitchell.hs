@@ -77,18 +77,16 @@ lambdas c | checkFreeVarCore c = do
         put $ s{suspend = filter ((`Map.notMember` arr) . coreFuncName) funcs}
         applyBodyCoreM (f arr) cr
     where
-        c = c2 -- coreReachable ["main"] c2
-        arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
-
-        f o@(CoreApp (CoreFun x) xs) = do
-            xs <- mapM f xs
-            let extra = arr x - length xs
+        f arr o@(CoreApp (CoreFun x) xs) = do
+            xs <- mapM (f arr) xs
+            let arity = arr Map.! x
+                extra = arity - length xs
             if extra <= 0 then return $ coreApp (CoreFun x) xs else do
-                vs <- getVars (arr x)
+                vs <- getVars arity
                 return $ coreApp (coreLam vs (coreApp (CoreFun x) (map CoreVar vs))) xs
 
-        f (CoreFun x) = f $ CoreApp (CoreFun x) []
-        f x = descendM f x
+        f arr (CoreFun x) = f arr $ CoreApp (CoreFun x) []
+        f arr x = descendM (f arr) x
 
 
 -- perform basic simplification to remove lambda's
