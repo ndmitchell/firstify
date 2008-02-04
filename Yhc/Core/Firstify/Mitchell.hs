@@ -28,6 +28,7 @@ type SS a = State S a
 
 data S = S {terminate :: Terminate -- termination check
            ,special :: BiMap.BiMap CoreFuncName CoreExpr -- which special variants do we have
+           ,suspend :: [CoreFunc]
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
            }
@@ -44,9 +45,9 @@ instance UniqueId b => UniqueId (a,b) where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = coreReachable ["main"] $ evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
+mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
     where
-        s0 = S (emptyTerminate True) BiMap.empty 0 (uniqueFuncsNext c2)
+        s0 = S (emptyTerminate True) BiMap.empty [] 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -68,7 +69,13 @@ step = f acts
 
 -- make sure every function is given enough arguments, by introducing lambdas
 lambdas :: Core -> SS Core
-lambdas c2 | checkFreeVarCore c2 = applyBodyCoreM f c
+lambdas c | checkFreeVarCore c = do
+        s <- get
+        let funcs = suspend s ++ coreFuncs c
+            cr = coreReachable ["main"] c{coreFuncs = funcs}
+            arr = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs cr]
+        put $ s{suspend = filter ((`Map.notMember` arr) . coreFuncName) funcs}
+        applyBodyCoreM (f arr) cr
     where
         c = c2 -- coreReachable ["main"] c2
         arr = (Map.!) $ Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
