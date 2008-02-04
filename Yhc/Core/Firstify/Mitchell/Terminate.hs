@@ -54,8 +54,10 @@ specKey = shellify . blurVar
 
 
 askSpec :: Terminate -> CoreFuncName -> CoreExpr -> Bool
-askSpec t within on = logger t ("Skipped spec of: " ++ show on) $
-    length (H.find (specKey on) $ specs $ get within t) <= 1
+askSpec t within on = logger t ("Skipped spec of:\n" ++ show on ++ "\nbecause of\n" ++ show res) $
+    length res <= 1
+    where
+        res = H.find (specKey on) $ specs $ get within t
 
 
 cloneSpec :: CoreFuncName -> CoreFuncName -> Terminate -> Terminate
