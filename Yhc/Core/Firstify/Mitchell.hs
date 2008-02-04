@@ -173,33 +173,30 @@ inline c = do
 -- BEFORE: map even x
 -- AFTER:  map_even x
 specialise :: Core -> SS Core
-specialise c = return c {- do
+specialise c = do
         s <- get
         (c,(new,s)) <- return $ flip runState ([],s) $
             applyFuncBodyCoreM (\name -> transformM (f name)) c
         put s
         return c{coreFuncs = new ++ coreFuncs c}
     where
-        f name x | t /= templateNone = do
+        f within x | t /= templateNone = do
                 (new,s) <- get
                 let tfull = templateExpand (`BiMap.lookup` special s) t
-                    th = shellify $ blurVar tfull
                     holes = templateHoles x t
-                    prev = H.find th homeo
                 case BiMap.lookupRev t (special s) of
                     -- OPTION 1: Not previously done, and a homeomorphic embedding
-                    Nothing | length prev > 2 ->
-                        trace ("Skipped specialisation of: " ++ show tfull ++
-                               "\nBecause of: " ++ show prev) $ return x
-                    -- OPTION 2: Previously done and not garbage collected
-                    Just name | name `elem` map coreFuncName (new ++ coreFuncs c) -> do
+                    Nothing | not $ askSpec (terminate s) within tfull -> return x
+                    -- OPTION 2: Previously done
+                    Just name ->
                         return $ coreApp (CoreFun name) holes
                     -- OPTION 3: New todo
                     done -> do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c{coreFuncs=new++coreFuncs c} name t
                         modify $ \(new,s) -> (fun : new,
-                             s{specialised = Map.insert name (H.insert th t homeo) (specialised s)
+                             s{terminate = cloneSpec within name $
+                                           addSpec (terminate s) within tfull
                               ,funcId = funcId s + 1
                               ,special = BiMap.insert name t (special s)
                               })
@@ -207,4 +204,3 @@ specialise c = return c {- do
             where t = templateCreate x
 
         f name x = return x
--}
