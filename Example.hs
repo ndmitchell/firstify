@@ -2,6 +2,7 @@
 module Example where
 
 import Array
+import YHC.Primitive
 
 
 int0 = 0 :: Int
@@ -62,3 +63,19 @@ main12 = array (0,0) [(0::Int,0::Int)]
 
 
 main13 = show (1 :: Double)
+
+
+main14 :: [(Int,Int)] -> Vector Int -> IO ()
+main14 ivs v = mapM_ (\(i,a)-> primUpdateVectorC i (_E a) v) ivs
+
+
+main15 = (sequence2 [return 'a', return 'b']) :: IO String
+
+
+sequence2       :: Monad m => [m a] -> m [a]
+sequence2 []     = return []
+sequence2 (c:cs) = do
+    x  <- c
+    xs <- sequence2 cs
+    return (x:xs)
+
