@@ -161,8 +161,8 @@ inline c = do
         -- note: deliberately use term from BEFORE this state
         -- so you keep inlining many times per call
         f term mp name (CoreFun x)
-            | x `Map.member` mp && askInline term name x
-            = do modify $ \s -> s{terminate = addInline (terminate s) name x}
+            | x `Map.member` mp && askInline name x term
+            = do modify $ \s -> s{terminate = addInline name x (terminate s)}
                  y <- duplicateExpr $ mp Map.! x
                  -- try and inline in the context of the person you are grabbing from
                  transformM (f term (Map.delete x mp) x) y
@@ -193,7 +193,7 @@ specialise c = do
                     holes = templateHoles x t
                 case BiMap.lookupRev t (special s) of
                     -- OPTION 1: Not previously done, and a homeomorphic embedding
-                    Nothing | not $ askSpec (terminate s) within tfull -> return x
+                    Nothing | not $ askSpec within tfull (terminate s) -> return x
                     -- OPTION 2: Previously done
                     Just name ->
                         return $ coreApp (CoreFun name) holes
@@ -203,7 +203,7 @@ specialise c = do
                         fun <- templateGenerate c{coreFuncs=new++coreFuncs c} name t
                         modify $ \(new,s) -> (fun : new,
                              s{terminate = cloneSpec within name $
-                                           addSpec (terminate s) within tfull
+                                           addSpec within tfull (terminate s)
                               ,funcId = funcId s + 1
                               ,special = BiMap.insert name t (special s)
                               })
