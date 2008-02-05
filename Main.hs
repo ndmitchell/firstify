@@ -15,7 +15,7 @@ import Yhc.Core.Firstify.MitchellOld
 import qualified Data.Map as Map
 
 
-data Actions = Reynolds | Mitchell | Stats | Help | MitchellOld
+data Actions = Reynolds | Mitchell | Stats | Help | MitchellOld | Normalise
              | Output String | MainIs CoreFuncName | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
@@ -23,9 +23,10 @@ data Actions = Reynolds | Mitchell | Stats | Help | MitchellOld
 opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
-    ,Option "M" []           (NoArg MitchellOld) "Perform old style Mitchell defunctionalisation (debugging)"
+    ,Option "M" []           (NoArg MitchellOld) "Debugging option (to be removed)"
     ,Option "s" ["stats"]    (NoArg Stats   ) "Show additional statistics"
     ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
+    ,Option "n" ["normal"]   (NoArg Normalise) "Normalise the result by basic inlining"
     ,Option "l" ["log"]      (NoArg Log     ) "Log all final results and statistics"
     ,Option "o" []     (ReqArg Output "file") "Where to put the output file"
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
@@ -84,6 +85,9 @@ main = do
 
     when (Log `elem` acts) $
         appendFile "log.txt" $ unlines [unwords args, showStats verbose c]
+
+    c <- return $ if Normalise `notElem` acts then c else
+                  coreReachable ["main"] $ coreInline InlineForward c
 
     putStrLn "Writing result"
     saveCore out c
