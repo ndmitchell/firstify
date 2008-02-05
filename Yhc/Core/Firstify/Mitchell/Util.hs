@@ -5,6 +5,12 @@ import Control.Monad
 import Data.Homeomorphic
 import Data.List
 import Yhc.Core
+import Yhc.Core.UniqueId
+
+
+instance UniqueId b => UniqueId (a,b) where
+    getId (a,b) = getId b
+    putId x (a,b) = (a, putId x b)
 
 
 shellify :: CoreExpr -> Shell CoreExpr1

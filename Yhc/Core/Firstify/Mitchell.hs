@@ -38,9 +38,6 @@ instance UniqueId S where
     getId = varId
     putId x s = s{varId = x}
 
-instance UniqueId b => UniqueId (a,b) where
-    getId (a,b) = getId b
-    putId x (a,b) = (a, putId x b)
 
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
