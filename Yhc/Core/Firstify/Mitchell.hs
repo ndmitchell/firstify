@@ -199,8 +199,8 @@ specialise c = do
                         let name = uniqueJoin (templateName t) (funcId s)
                         fun <- templateGenerate c{coreFuncs=new++coreFuncs c} name t
                         modify $ \(new,s) -> (fun : new,
-                             s{terminate = cloneSpec within name $
-                                           addSpec within tfull (terminate s)
+                             s{terminate = addSpec name tfull $
+                                           cloneSpec within name $ terminate s
                               ,funcId = funcId s + 1
                               ,special = BiMap.insert name t (special s)
                               })
