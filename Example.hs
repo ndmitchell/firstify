@@ -36,7 +36,7 @@ main6 = show [()]
 
 -- NOTE: Cannot be firstified
 data Wrap a = Wrap (Wrap a) | Value a
-f a = Wrap a
+f a = f (Wrap a)
 main7 = f (Value id)
 
 
