@@ -38,6 +38,14 @@ applyFuncBodyCoreM f = applyFuncCoreM g
         g (CoreFunc name args body) = liftM (CoreFunc name args) $ f name body
         g x = return x
 
+applyFuncBodyCoreMapM :: Monad m => (CoreFuncName -> CoreExpr -> m CoreExpr) -> CoreFuncMap -> m CoreFuncMap
+applyFuncBodyCoreMapM f = liftM Map.fromList . mapM g . Map.toList
+    where
+        g (n1, CoreFunc n2 args body) = do
+            body <- f n2 body
+            return (n1, CoreFunc n2 args body)
+        g x = return x
+
 
 checkFreeVarFuncs :: [CoreFunc] -> Bool
 checkFreeVarFuncs funcs = all f funcs && disjoint vars
