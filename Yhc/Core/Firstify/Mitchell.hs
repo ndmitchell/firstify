@@ -28,7 +28,8 @@ type SS a = State S a
 
 data S = S {terminate :: Terminate -- termination check
            ,special :: BiMap.BiMap CoreFuncName CoreExpr -- which special variants do we have
-           ,suspend :: [CoreFunc]
+           ,suspend :: CoreFuncMap
+           ,coreRest :: Core -- the functions are not there
            ,varId :: Int -- what is the next variable id to use
            ,funcId :: Int -- what is the next function id to use
            }
@@ -42,9 +43,10 @@ instance UniqueId S where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
+mitchell c = fromCoreFuncMap c2 res
     where
-        s0 = S (emptyTerminate True) BiMap.empty [] 0 (uniqueFuncsNext c2)
+        res = evalState (liftM toCoreFuncMap (uniqueBoundVarsCore c2) >>= step) (s0 :: S)
+        s0 = S (emptyTerminate True) BiMap.empty Map.empty c2 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
@@ -52,7 +54,7 @@ mitchell c = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
 -- and let's that appear to be bound to an unsaturated
 --
 -- Then specialise each value
-step :: Core -> SS Core
+step :: CoreFuncMap -> SS CoreFuncMap
 step = f acts
     where
         (*) = (,)
@@ -65,31 +67,30 @@ step = f acts
 
 
 -- make sure every function is given enough arguments, by introducing lambdas
-lambdas :: Core -> SS Core
-lambdas c | checkFreeVarCore c = do
+lambdas :: CoreFuncMap -> SS CoreFuncMap
+lambdas c | checkFreeVarCoreMap c = do
         s <- get
-        let funcs = suspend s ++ coreFuncs c
-            cr = coreReachable ["main"] c{coreFuncs = funcs}
-            arr = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs cr]
-        put $ s{suspend = filter ((`Map.notMember` arr) . coreFuncName) funcs}
-        applyBodyCoreM (f arr) cr
+        let funcs = c `Map.union` suspend s
+            alive = coreReachableMap ["main"] funcs
+        put $ s{suspend = Map.filterWithKey (\key _ -> key `Map.notMember` alive) funcs}
+        applyBodyCoreMapM (f alive) alive
     where
-        f arr o@(CoreApp (CoreFun x) xs) = do
-            xs <- mapM (f arr) xs
-            let arity = arr Map.! x
+        f alive o@(CoreApp (CoreFun x) xs) = do
+            xs <- mapM (f alive) xs
+            let arity = coreFuncArity $ alive Map.! x
                 extra = arity - length xs
             if extra <= 0 then return $ coreApp (CoreFun x) xs else do
                 vs <- getVars arity
                 return $ coreApp (coreLam vs (coreApp (CoreFun x) (map CoreVar vs))) xs
 
-        f arr (CoreFun x) = f arr $ CoreApp (CoreFun x) []
-        f arr x = descendM (f arr) x
+        f alive (CoreFun x) = f alive $ CoreApp (CoreFun x) []
+        f alive x = descendM (f alive) x
 
 
 -- perform basic simplification to remove lambda's
 -- basic idea is to lift lambda's outwards to the top
-simplify :: Core -> SS Core
-simplify c = return . applyFuncCore g =<< transformExprM f c
+simplify :: CoreFuncMap -> SS CoreFuncMap
+simplify c = return . applyFuncCoreMap g =<< transformExprM f c
     where
         g (CoreFunc name args (CoreLam vars body)) = CoreFunc name (args++vars) body
         g x = x
@@ -146,14 +147,14 @@ simplify c = return . applyFuncCore g =<< transformExprM f c
 
 -- BEFORE: box = [even]
 -- AFTER:  all uses of box are inlined
-inline :: Core -> SS Core
+inline :: CoreFuncMap -> SS CoreFuncMap
 inline c = do
     s <- get
-    let todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- coreFuncs c
+    let todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- Map.elems c
                             ,shouldInline body]
     if Map.null todo
         then return c
-        else applyFuncBodyCoreM (\name -> transformM (f (terminate s) todo name)) c
+        else applyFuncBodyCoreMapM (\name -> transformM (f (terminate s) todo name)) c
     where
         -- note: deliberately use term from BEFORE this state
         -- so you keep inlining many times per call
@@ -176,13 +177,13 @@ inline c = do
 
 -- BEFORE: map even x
 -- AFTER:  map_even x
-specialise :: Core -> SS Core
+specialise :: CoreFuncMap -> SS CoreFuncMap
 specialise c = do
         s <- get
-        (c,(new,s)) <- return $ flip runState ([],s) $
-            applyFuncBodyCoreM (\name -> transformM (f name)) c
+        (c,(new,s)) <- return $ flip runState (Map.empty,s) $
+            applyFuncBodyCoreMapM (\name -> transformM (f name)) c
         put s
-        return c{coreFuncs = new ++ coreFuncs c}
+        return $ c `Map.union` new
     where
         f within x | t /= templateNone = do
                 (new,s) <- get
@@ -197,8 +198,9 @@ specialise c = do
                     -- OPTION 3: New todo
                     done -> do
                         let name = uniqueJoin (templateName t) (funcId s)
-                        fun <- templateGenerate (coreFunc c{coreFuncs=new++coreFuncs c}) name t
-                        modify $ \(new,s) -> (fun : new,
+                            findCoreFunc name = Map.findWithDefault (new Map.! name) name c
+                        fun <- templateGenerate findCoreFunc name t
+                        modify $ \(new,s) -> (Map.insert name fun new,
                              s{terminate = addSpec name tfull $
                                            cloneSpec within name $ terminate s
                               ,funcId = funcId s + 1
