@@ -84,3 +84,13 @@ applyBodyCoreMapM f x = return . Map.fromAscList =<< mapM g (Map.toAscList x)
             return (n1, CoreFunc n2 args body)
         g x = return x
 
+
+applyFuncCoreMap :: (CoreFunc -> CoreFunc) -> CoreFuncMap -> CoreFuncMap
+applyFuncCoreMap = Map.map
+
+
+instance (Ord a, UniplateExpr b) => UniplateExpr (Map.Map a b) where
+    uniplateExpr x = (child, \y -> Map.fromAscList $ zip keys (gen y))
+        where
+            (child,gen) = uniplateExpr elems
+            (keys,elems) = unzip $ Map.toAscList x
