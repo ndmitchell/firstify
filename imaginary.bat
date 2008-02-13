@@ -8,7 +8,7 @@ goto end
 
 :continue
 echo Processing %1
-main imaginary\%1.yca -mshl -o imaginary\obj\%1 > imaginary\obj\%1.txt 2>&1
+firstify imaginary\%1.yca -mshl -o imaginary\obj\%1 > imaginary\obj\%1.txt 2>&1
 goto end
 
 
