@@ -197,7 +197,7 @@ specialise c = do
                     -- OPTION 3: New todo
                     done -> do
                         let name = uniqueJoin (templateName t) (funcId s)
-                        fun <- templateGenerate c{coreFuncs=new++coreFuncs c} name t
+                        fun <- templateGenerate (coreFunc c{coreFuncs=new++coreFuncs c}) name t
                         modify $ \(new,s) -> (fun : new,
                              s{terminate = addSpec name tfull $
                                            cloneSpec within name $ terminate s

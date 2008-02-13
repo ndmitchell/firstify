@@ -58,9 +58,9 @@ templateExpand mp = transform f
         f x = x
 
 
-templateGenerate :: UniqueIdM m => Core -> CoreFuncName -> Template -> m CoreFunc
-templateGenerate c newname o@(CoreApp (CoreFun name) xs) = do
-    let fun = coreFunc c name
+templateGenerate :: UniqueIdM m => (CoreFuncName -> CoreFunc) -> CoreFuncName -> Template -> m CoreFunc
+templateGenerate ask newname o@(CoreApp (CoreFun name) xs) = do
+    let fun = ask name
         CoreFunc _ args body | isCoreFunc fun = fun
             | otherwise = error $ "Tried specialising on a primitve: " ++ show o
     x <- duplicateExpr $ coreLam args body
