@@ -4,6 +4,7 @@ module Yhc.Core.Firstify.Mitchell.Util where
 import Control.Monad
 import Data.Homeomorphic
 import Data.List
+import qualified Data.Map as Map
 import Yhc.Core
 import Yhc.Core.UniqueId
 
@@ -38,10 +39,10 @@ applyFuncBodyCoreM f = applyFuncCoreM g
         g x = return x
 
 
-checkFreeVarCore :: Core -> Bool
-checkFreeVarCore c = all f (coreFuncs c) && disjoint vars
+checkFreeVarFuncs :: [CoreFunc] -> Bool
+checkFreeVarFuncs funcs = all f funcs && disjoint vars
     where
-        vars = concat [v ++ collectBoundVars x | CoreFunc _ v x <- coreFuncs c]
+        vars = concat [v ++ collectBoundVars x | CoreFunc _ v x <- funcs]
 
         f func@(CoreFunc _ args x) =
             if null (collectFreeVars x \\ args) then True
@@ -51,6 +52,14 @@ checkFreeVarCore c = all f (coreFuncs c) && disjoint vars
 
         disjoint x = if null res then True else error $ "not disjoint: " ++ show res
             where res = filter (not . null) . map tail . group . sort $ x
+
+
+checkFreeVarCoreMap :: CoreFuncMap -> Bool
+checkFreeVarCoreMap = checkFreeVarFuncs . Map.elems
+
+checkFreeVarCore :: Core -> Bool
+checkFreeVarCore = checkFreeVarFuncs . coreFuncs
+
 
 
 -- check a function is confluent
@@ -66,4 +75,12 @@ checkConfluent name f x = do
                 g x = show (coreFunc x badfunc) ++ "\n======\n"
             error $ name ++ ":\n" ++ g x ++ g x2 ++ g x3
 
+
+applyBodyCoreMapM :: Monad m => (CoreExpr -> m CoreExpr) -> CoreFuncMap -> m CoreFuncMap
+applyBodyCoreMapM f x = return . Map.fromAscList =<< mapM g (Map.toAscList x)
+    where
+        g (n1,CoreFunc n2 args body) = do
+            body <- f body
+            return (n1, CoreFunc n2 args body)
+        g x = return x
 
