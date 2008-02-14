@@ -71,7 +71,6 @@ main14 ivs v = mapM_ (\(i,a)-> primUpdateVectorC i (_E a) v) ivs
 
 main15 = (sequence2 [return 'a', return 'b']) :: IO String
 
-
 sequence2       :: Monad m => [m a] -> m [a]
 sequence2 []     = return []
 sequence2 (c:cs) = do
@@ -79,3 +78,11 @@ sequence2 (c:cs) = do
     xs <- sequence2 cs
     return (x:xs)
 
+
+main16 = catch (putChar 'a') (\_ -> putChar 'b')
+
+main17 s = lines' s id
+  where
+  lines' []             acc = [acc []]
+  lines' ('\n':s)       acc = acc ['\n'] : lines' s id  -- Unix
+  lines' (c:s)          acc = lines' s (acc . (c:))
