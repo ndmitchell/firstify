@@ -3,6 +3,7 @@ module Yhc.Core.Firstify.Mitchell.Template where
 
 import Control.Monad.State
 import Data.List
+import Debug.Trace
 import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
@@ -16,10 +17,20 @@ templateNone = CoreVar "_"
 
 
 -- given an expression, what would be the matching template
--- assume template is called in a bottom-up manner, so
--- can ignore the effect of multiple templatings
-templateCreate :: CoreExpr -> Template
-templateCreate o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
+-- must be careful to avoid if there is an inner template not redoing it
+templateCreate :: (CoreFuncName -> Bool) -> CoreExpr -> Template
+templateCreate isPrim o@(CoreApp (CoreFun x) xs)
+        | any ((/=) templateNone . templateCheck) $ tail $ universe o = templateNone
+        | isPrim x && res /= templateNone = trace ("Warning: primitive HO call, " ++ x) templateNone
+        | otherwise = res
+    where
+        res = templateCheck o
+
+templateCreate _ _ = templateNone
+
+
+templateCheck :: CoreExpr -> Template
+templateCheck o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         uniqueBoundVars $ join (CoreApp (CoreFun x)) (map f xs)
     where
         free = collectFreeVars o
@@ -32,7 +43,8 @@ templateCreate o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
         join g xs | any (/= templateNone) xs = g xs
                   | otherwise = templateNone
 
-templateCreate _ = templateNone
+templateCheck _ = templateNone
+
 
 
 -- pick a human readable name for a template result

@@ -185,6 +185,8 @@ specialise c = do
         put s
         return $ c `Map.union` new
     where
+        isPrim x = maybe False isCorePrim $ Map.lookup x c
+
         f within x | t /= templateNone = do
                 (new,s) <- get
                 let tfull = templateExpand (`BiMap.lookup` special s) t
@@ -207,6 +209,6 @@ specialise c = do
                               ,special = BiMap.insert name t (special s)
                               })
                         return $ coreApp (CoreFun name) holes
-            where t = templateCreate x
+            where t = templateCreate isPrim x
 
         f name x = return x
