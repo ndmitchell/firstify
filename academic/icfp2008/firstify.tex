@@ -20,7 +20,22 @@
 % \todo - write out a todo reminder, easy to grep for
 \newcommand{\todo}[1]{\textbf{\textsc{Todo:} #1}}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% LHS2TEX
 
+\setlength\blanklineskip{3mm}
+\setlength\mathindent{0mm}
+
+
+\renewcommand{\Varid}[1]{\mathsf{#1}}
+\renewcommand{\Conid}[1]{\mathsf{#1}}
+\renewcommand{\Varid}[1]{\mathsf{#1}}
+\newcommand{\Keyword}[1]{\text{\textbf{\textsf{#1}}}}
+
+\newcommand{\backtick}[1]{\;\mathsf{\text{\`{}}\!#1\!\text{\`{}}}\;}
+
+\newcommand{\perc}{\%
+    }
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% EXAMPLES
@@ -91,13 +106,30 @@ Haskell, first-order reduction, defunctionalisation, functional programming
 
 Higher-order functions are well used and much loved within functional programming languages such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into a the application of a function taking a tuple containing many functional values -- as part of the dictionary transformation for the implementation of type classes. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{catch} and termination checking \cite{termination_checking}.
 
-We propose a solution: preprocess the program to remove the functional values, without changing the semantics of the program. This idea is not new, indeed as far back as 19** Reynold's gave a solution, Reynold's style defunctionalisation. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
+\begin{example}
+\begin{code}
+incList :: Int -> Int
+incList = map (+1)
+\end{code}
+
+Consider the above definition of |incList|, containing many higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has lead to short code, but we could equally have written:
+
+\begin{code}
+incList :: Int -> Int
+incList []      = []
+incList (x:xs)  = x+1 : incList xs
+\end{code}
+
+While the second variant of |incList| is much longer, it may also be more amenable to certain types of analysis -- and indeed may also perform faster at runtime. We aim to automatically transform from a program with functional values, to one without.
+\end{example}
+
+Our first-order reduction method processes the program as a whole to remove the functional values, without changing the semantics of the program. This idea is not new, indeed as far back as 19** Reynold's gave a solution, Reynold's style defunctionalisation. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
 
 Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler (Yhc). We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our method available as a library on Hackage -- and hope others from the termination checking community may be able to make use of it.
 
 Our goals are primarily for analysis of the resultant code, not to compile and execute the result. Because we are not interested in performance, we permit the loss of sharing in computations, if to do so will remove functional values.
 
-This paper starts with a definition of our Core language \S?, including what we consider to be a higher-order function. We then review Reynold's style defunctionalisation \S?. Next we present out method in \S?, motivated by a series of examples. Next we classify where out method may fail to remove higher order functions. We then prove that our method is correct in \S?, and terminating in \S?. Finally we give results \S?, review related work \S? and conclude.
+This paper starts with a definition of our Core language \S?, including what we consider to be a higher-order function. We then review Reynold's style defunctionalisation \S?. Next we present out method in \S?, motivated by a series of examples. Next we classify where out method may fail to remove higher order functions. We then prove that our method is correct in \S?, and terminating in \S?. Finally we give results \S?, review related work \S? and conclude \S?.
 
 \section{Our Core Language}
 
@@ -115,6 +147,8 @@ expr  =  \vs_ -> x
 
 alt = c vs_ -> x
 \end{code}
+
+We let |v| range over variables, |x| over expressions, |f| over function names and |c| over constructors.
 \caption{Core Language.}
 \label{fig:core}
 \end{figure}
@@ -134,7 +168,7 @@ even = (.) not odd
 
 map f x = case  x of
                 []    -> []
-                y:ys  -> f @ y : map f ys
+                y:ys  -> f y : map f ys
 \end{code}
 
 The |even| function passes |not| and |odd| to the function |(.)|, both of which are functional values. In addition, the |(.)| function, when applied to only two arguments, returns a functional value. The definition of |map| does not create any functional values, but applies the variable |f| to an argument, suggesting that |f| is a functional value.
@@ -156,15 +190,20 @@ example2 xs = map id xs
 Here |example1| contains an explicit lambda, which is a functional value. In |example2| the function |id| has an arity of 1, but is not given any arguments, and hence is a functional value.
 \end{example}
 
-It is possible for a program to have either one of these syntatic conditions, but at runtime, not create any functional values. Consider the following code:
+It is possible for a program to have either one of these syntactic conditions, but at runtime, not create any functional values. Consider the following examples:
 
 \begin{code}
-main = case  True of
-             True   -> 1
-             False  -> (\x -> x) 2
+example1 = case  True of
+                 True   -> 1
+                 False  -> (\x -> x) 2
+
+example2 = x (\y -> y)
+    where x = x
+
+example3 = (error "bang") (\x -> x)
 \end{code}
 
-Here the |True| branch will always be taken due to the known case scrutinee. The |False| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. This situation can be thought of as having functional elements in dead code.
+In |example1| the |True| branch will always be taken due to the known case scrutinee. The |False| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. In |example2| and |example3| the a lambda is applied to |undefined|, so the program will terminate before the lambda is evaluated. These situations can all be thought of as having functional elements in dead code.
 
 
 \subsection{Applying Functional Values}
@@ -185,13 +224,17 @@ As before, we can construct an example where a functional value is applied, but 
 
 \begin{example}
 \begin{code}
-example1 = error "bang" 42
+example1 = case  Nothing of
+                 Nothing  ->  1
+                 Just x   ->  x 1
 
-example2 = x 42
+example2 = error "bang" 42
+
+example3 = x 42
     where x = x
 \end{code}
 
-In |example1| the |error| primitive is being given two arguments, even though at first glance it appears to only take one. The is possible because the type of error is |String -> alpha|, where |alpha| is completely unconstrained and can be anything, including a functional type. In |example2| the value |42| is being passed to |x|. At runtime |x| will not terminate, and semantically reduces to |undefined|.
+In |example1| the value |x| is taken from a data constructor, when we know no value will ever match. In |example2| the |error| primitive is being given two arguments, even though at first glance it appears to only take one. The is possible because the type of error is |String -> alpha|, where |alpha| is completely unconstrained and can be anything, including a functional type. In |example2| the value |42| is being passed to |x|. At runtime |x| will not terminate, and semantically reduces to |undefined|.
 \end{example}
 
 \subsection{First-Order Core}
@@ -221,7 +264,6 @@ newtype IO alpha = IO (World -> _E alpha)
 At compilation time the |newtype| wrapper is removed, leaving a function from |World| to |_E alpha|. The |main| argument therefore takes a |World| parameter, before returning a first-order result. We permit the increasing of the arity of |main|.
 \end{example}
 
-
 \begin{example}
 \begin{code}
 main f = f id
@@ -237,13 +279,12 @@ main = id `seq` 42
 
 Here a functional value (|id|) is passed to the primitive |seq|. As we are not able to peer inside the primitive, and must preserve its interface, we cannot remove this functional value. For most primitives, such as arithmetic operations, the types ensure that no functional values are passed as arguments. However, the |seq| primitive is of type |alpha -> beta -> beta|, allowing any type to be passed as either of the arguments, including functional values.
 
-Another primitive which permits functional values is |primCatch :: alpha -> (beta -> alpha) -> alpha|. While |seq| merely permits functional values, |primCatch| actually \textit{requires} that the second argument is a functional value.
+Some primitives not only permit functional values, but actually \textit{require} them. The |primCatch| function within the Yhc standard libraries implements the Haskell exception handling function |catch|. Tye type of |primCatch| is |alpha -> (IOError -> alpha) -> alpha|, taking an exception handler as one of the arguments.
 \end{example}
 
-In all these examples, a functional value must be created as it is required by either the interface to a primitive, or the interface to the root function. In a similar manner, the root function may have a functional argument, or a primitive may return a functional value, resulting in a functional application.
+In all these examples, a functional value must be created as it is required by an interface external to the program under transformation -- either a primitive or the root function. If none of the above cases occurs, then it is always possible to remove all function values from a Core program.
 
-If none of the above cases occurs, then it is always possible to remove all function values from a Core program. In the following sections we will assume that the root function returns a first-order value, and takes no parameters. We also assume there are no primitive functions. One method for removing higher-order functions is Reynolds style defunctionalisation, which we detail first. Next we detail our method, which has some important differences from Reynold's method.
-
+In the following sections we will assume that the root function returns a first-order value, and takes no parameters. We also assume there are no primitive functions. We first present Reynold's method for removing higher-order functions, followed by our method.
 
 \section{Reynolds style defunctionalization}
 
@@ -311,17 +352,31 @@ test = get "foo" (Add3 "bar" 4 (Add3 "baz" 2 New))
 Here we use the constructor |Add3| to represent the |add| function with three arguments pre-applied. Note that the |Function| data type now serves to store a linked-list of the values with |New| serving a similar role to |[]|, and |Add3| storing one key/value pair along with the remainder of the list.
 \end{example}
 
-We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the |Ap| data type. Defunctionalized code is still type safe, but type checking would require a dependently typed language. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
+We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the |Function| data type. Defunctionalized code is still type safe, but type checking would require a dependently typed language. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
 
-Some uses of Reynold's method include as preprocessing step in a whole-program analysis \cite{grin,jhc} and as a step in a program transformation \cite{graham_hutton_calculating_an_exceptional_machine}.
+Reynold's method has been used as a tool in program calculation \cite{graham_hutton_calculating_an_exceptional_machine, another_one, another_one}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
+
 
 \section{Our First-Order Reduction Method}
 
-A natural desire would be to eliminate the higher-order aspects of a program, without introducing any new data structures. However, it is simple to show that this transformation is not possible. Given a program, we can remove all data structures by Church encoding \cite{church_encode}. If we then had a transformation which made the program first-order \textit{without} introducing any data, we would end up with a program without data or closures, which is therefore incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
+Reynold's method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type. A natural desire would be to eliminate the higher-order aspects of a program, \textit{without} introducing any new data structures. Unfortunately, such a transformation is not possible.
 
-Our reduction method proceeds in four steps, each removing some higher-order elements, without introducing any data structures. Each step is independently terminating, and are combined using a fixed point operator. Because our method terminates and does not introduce any data structures, it is necessarily incomplete -- but Reynold's method can be used afterwards. Our method can be trivially extended to work in a setting where primitives exist, and we explain how to do after.
+Given a program, we can remove all data structures by Church encoding \cite{church_encode}. If we then had a transformation which made the program first-order \textit{without} introducing any data, we would end up with a program without data or closures, which is therefore incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
 
-Our method proceeds in four steps:
+Before describing our method, we first give a list of desirable features of our algorithm -- in priority order. Often one criteria implies that future goals cannot be met.
+
+\begin{enumerate}
+\item Our method must be correct and terminating.
+\item We do not wish to introduce any additional data values.
+\item We would like to remove as many functional values as possible.
+\item We would like to preserve the sharing behaviour of the program.
+\end{enumerate}
+
+Our reduction method proceeds in four steps, which are combined using a fixed point operator. Because our method terminates and does not introduce any data structures, it is necessarily incomplete -- but Reynold's method can be used afterwards if necessary. Our method can be trivially extended to work in a setting where primitives exist, and we explain how to do so.
+
+For the implementation, available at ..., we have implemented our steps within a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. To simplify the presentation, we have ignored these issues -- while these are tedious engineering issues, they do not effect the algorithm.
+
+Our method is written as:
 
 \begin{code}
 firstify = lambdas +|+ simplify +|+ inline +|+ specialise
@@ -355,7 +410,7 @@ forall f g x `o` let r = (+|+) f g x in f r == r && g r == r
 forall f g x `o` let r = (+|+) f g x in r == (+|+) f g r
 \end{code}
 
-\item[Function ordering] The function |f| will have reached a fixed point before the function |g| is applied.
+\item[Function ordering] The function |f| will have reached a fixed point before the function |g| is applied. If a postcondition of |f| implies a precondition of |g|, then we can guarantee |g|'s precondition will always be met. If both |f| and |g| could be applied, |f| will be applied first.
 \end{description}
 
 The final property allows us to overlap the application sites between the two arguments, but guarantee the first will always be chosen. The other two properties ensure that when the operation finishes there will be no further sites where application could occur.
@@ -384,7 +439,21 @@ even = \x -> (.) (\y -> not y) (z -> odd z) x
 Here the |even| function, which previously had three instances of partial application, has three lambda expressions inserted. Now each function is applied to a number of arguments equal to its arity.
 \end{examplerevisit}
 
-For each partially applied function, a lambda expression is inserted to ensure that the function is now given at least as many arguments as its associated arity. This step trades one form of function creation for another form, but has the advantage of making functional values more explicit.
+For each partially applied function, a lambda expression is inserted to ensure that the function is now given at least as many arguments as its associated arity. Given a function |f| of arity $n$, if an application of |f| has fewer than $n$ arguments, an application and a lambda is inserted with $n$ arguments. This step trades one form of functional value creation for another form, but has the advantage of making functional values more explicit.
+
+In general, the insertion of a lambda and application is not semantics preserving:
+
+\begin{code}
+x => \v -> x v
+\end{code}
+
+Consider for instance |undefined `seq` 1|, which evaluates to |undefined|. Applying the lambda introduction rule we can replace the code with |(\v -> undefined v) `seq` 1|, which evaluates to |1|. Similarly, we could replace |1| with |\v -> 1 v|, which is neither semantics preserving nor type safe. However, a closely allied operation that is both semantics preserving and type safe is:
+
+\begin{code}
+\v -> x => \v' -> (\v -> x) v'
+\end{code}
+
+The lambda insertion phase can be seen as first transforming the function |f| using the lambda insertion rule, then inlining the outer lambda into the application site. These operations are semantics preserving, and standard within the field of program transformation.
 
 \subsection{Simplification (|simplify|)}
 
@@ -641,19 +710,6 @@ Given an expression |v (\v' -> x)|, the variable |v| must evaluate to |undefined
 
 To prove the correctness of the whole argument it is sufficient to show the correctness of each step. The simplification rules are all standard within lazy Core languages. The inlining and specialisation stages are also based on well accepted transformations. the only interesting case, from a correctness perspective, is lambda insertion.
 
-The rule for lambda insertion expands all partially applied functions so they are given sufficiently many arguments. Given a function |f| of arity $n$, if an application of |f| has fewer than $n$ arguments, an application and a lambda is inserted with $n$ arguments. In general, the insertion of a lambda and application is not semantics preserving:
-
-\begin{code}
-x => \v -> x v
-\end{code}
-
-Consider for instance |undefined `seq` 1|, which evaluates to |undefined|. Applying the lambda introduction rule we can replace the code with |(\v -> undefined v) `seq` 1|, which evaluates to |1|. However, a closely allied operation that is semantics preserving is:
-
-\begin{code}
-\v -> x => \v' -> (\v -> x) v'
-\end{code}
-
-The lambda insertion phase can be seen as first transforming the function |f| using the lambda insertion rule, then inlining the outer lambda into the application site. These operations are semantics preserving, and relatively standard.
 
 
 \section{Proof of Termination}
@@ -720,7 +776,7 @@ Our preferred method for higher-order function removal is to apply specialisatio
 
 \section{Conclusions}
 
-We have developed a method for removing functional values from a program. Our method has good results, and has found practical use within the Catch ool. 
+We have developed a method for removing functional values from a program. Our method has good results, and has found practical use within the Catch tool.
 
 
 
