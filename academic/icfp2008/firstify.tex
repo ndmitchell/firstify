@@ -391,8 +391,8 @@ infixl +|+
 (+|+) f g x  = fix (fix x . y)
 
 fix :: Eq alpha => (alpha -> alpha) -> alpha -> alpha
-fix f x = if x == x2 then x else fix f x2
-    where x2 = f x
+fix f x = if x == x' then x else fix f x'
+    where x' = f x
 \end{code}
 
 The |(+||+)| operator applies the first argument until it reaches a fixed point, then applies the second argument. If the second argument changes the value, the first argument is tried again until a fixed point is achieved. This formulation has several important properties:
@@ -457,31 +457,83 @@ The lambda insertion phase can be seen as first transforming the function |f| us
 
 \subsection{Simplification (|simplify|)}
 
-\begin{figure}
-\newcommand{\f}[2]{\vspace{-7mm} #2 & (#1) \\}
+\newcommand{\simp}[2]{\vspace{-7mm} #2 & (#1) \\}
+\newenvironment{simplify}
+    {\begin{flushright}
+     \begin{tabular}{p{6.5cm}r}
+    }
+    {\end{tabular}
+     \end{flushright}
+    }
 
-\begin{flushright}
-\begin{tabular}{p{8cm}r}
-\f{case-lam}{
+\begin{figure}
+\begin{simplify}
+
+\simp{app-app}{
+\begin{code}
+(x xs_) ys_
+    => x xs_ ys_
+\end{code}}
+
+\simp{lam-lam}{
+\begin{code}
+\vs_ -> (\ws_ -> x)
+    => \vs_ ws_ -> x
+\end{code}}
+
+\simp{lam-app}{
+\begin{code}
+(\v -> x) y
+    => let v = y in x
+\end{code}}
+
+\simp{case-con}{
+\begin{code}
+case c xs_ of {... ; c vs_ -> y ; ...}
+    => let vs_ = xs_ in y
+\end{code}}
+
+\simp{case-app}{
+\begin{code}
+(case x of {p_1 -> y_1 ; ... ; p_n -> y_n}) z
+    => case x of {p_1 -> y_1 z ; ... ; p_n -> y_n z}
+\end{code}}
+
+\simp{let-app}{
+\begin{code}
+(let v = x in y) z
+    => let v = x in y z
+\end{code}}
+
+\end{simplify}
+\caption{Standard Core simplification rules.}
+\label{fig:simplify}
+\end{figure}
+
+
+\begin{figure}
+\begin{simplify}
+
+\simp{case-lam}{
 \begin{code}
 case x of {... ; c vs_ -> \v -> y ; ...}
-    => \v' -> case x of {... ; c vs_ -> \v -> y ; ...} v'
+    => \w -> case x of {... ; c vs_ -> \v -> y ; ...} w
 \end{code}}
 
-\f{bind-lam}{
+\simp{bind-lam}{
 \begin{code}
-let v = \v' -> x in y
-    => y[v/ \v' -> x]
+let v = \w -> x in y
+    => y[v / \w -> x]
 \end{code}}
 
 
-\f{let-lam}{
+\simp{let-lam}{
 \begin{code}
-let v = x in \v' -> y
-    => \v' -> let v = x in y
+let v = x in \w -> y
+    => \w -> let v = x in y
 \end{code}}
-\end{tabular}
-\end{flushright}
+
+\end{simplify}
 \caption{Lambda Simplification rules.}
 \label{fig:lambda_simplify}
 \end{figure}
@@ -491,12 +543,12 @@ The second stage attempts to move lambda's upwards until they form part of the a
 We also require the additional simplification rule:
 
 \begin{code}
-f vs (\vs' -> x) = f (vs ++ vs') x
+f vs_ (\ws_ -> x) = f (vs_ ws_) x
 \end{code}
 
 In this particular instance, the introduction of lambda expressions changes the arity of |even| from 0 to 1, possibly requiring applications of |even| to become partially applied, causing |lambdas| to be invoked.
 
-The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (let-lam) rule is the one responsible for the largest loss of sharing, promoting a lambda expression outside a let.
+The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (let-lam) rule is the one responsible for the largest loss of sharing, promoting a lambda expression outside a let, although (case-lam) can be used in a similar manner to reduce the sharing.
 
 \begin{example}
 \begin{code}
@@ -662,6 +714,8 @@ We have now eliminated all the functional values from within this operation.
 The specialisation is the only section that requires extending when working within a language containing primitives. The only restriction is that if a function to be specialised is actually a primitive, no template should be generated. The reason for this is because the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
 
 \section{Proof of Completeness}
+
+\todo{This proof sucks -- even if you remove simplify, the inlining of lambdas ensures you non-terminate. Or rather, the inlining rule assumes there is a context to inline into, which is not the case if you miss simplifications and promote them to the root.}
 
 The algorithm we have presented is complete, in the sense that if it terminates, there will be no remaining lambda expressions within the program, other than those identified bellow. We have already shown that it is impossible to have both completeness and not introduce data structures (which our algorithm does not), therefore it follows that our algorithm is \textit{not} terminating. We shall return to the issue of termination in \S\ref{sec:firstify_terminate}, but assuming that our algorithm does terminate, it is possible to show that there are no remaining functional values.
 
