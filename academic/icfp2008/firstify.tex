@@ -2,72 +2,10 @@
 
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{url}
 \usepackage{natbib}
-\usepackage{datetime}
-\usepackage{comment}
 
-% from the ICFP website
-\bibpunct();A{},
-\let\cite=\citep
-
-%include polycode.fmt
-%include firstify.fmt
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% CUSTOM COMMANDS
-
-% \todo - write out a todo reminder, easy to grep for
-\newcommand{\todo}[1]{\textbf{\textsc{Todo:} #1}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% LHS2TEX
-
-\setlength\blanklineskip{3mm}
-\setlength\mathindent{0mm}
-
-
-\renewcommand{\Varid}[1]{\mathsf{#1}}
-\renewcommand{\Conid}[1]{\mathsf{#1}}
-\renewcommand{\Varid}[1]{\mathsf{#1}}
-\newcommand{\Keyword}[1]{\text{\textbf{\textsf{#1}}}}
-
-\newcommand{\backtick}[1]{\;\mathsf{\text{\`{}}\!#1\!\text{\`{}}}\;}
-
-\newcommand{\perc}{\%
-    }
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% EXAMPLES
-
-\newcounter{exmp}
-\setcounter{exmp}{0}
-
-% generic example (can be anything)
-\newenvironment{exampleany}[1]
-    {\subsubsection*{Example #1}}
-    {\hfill$\Box$}
-
-% standard example
-\newenvironment{example}
-    {\refstepcounter{exmp}
-     \begin{exampleany}{\arabic{exmp}}}
-    {\end{exampleany}}
-
-% naming an example
-\newenvironment{examplename}[1]
-    {\refstepcounter{exmp}
-     \begin{exampleany}{\arabic{exmp} (#1)}}
-    {\end{exampleany}}
-
-% revisiting a previous example
-\newenvironment{examplerevisit}[1]
-    {\begin{exampleany}{#1 (revisited)}}
-    {\end{exampleany}}
-
-% \end{code} followed by \end{example}
-\newcommand{\codeexample}{\vspace{-9mm}\par}
-
+\include{paper}
+%include paper.fmt
 
 \begin{document}
 
@@ -463,7 +401,9 @@ The lambda insertion phase can be seen as first transforming the function |f| us
      \begin{tabular}{p{6.5cm}r}
     }
     {\end{tabular}
+v v v v v v v
      \vspace{-7mm}
+^ ^ ^ ^ ^ ^ ^
      \end{flushright}
     }
 
@@ -838,7 +778,7 @@ We have developed a method for removing functional values from a program. Our me
 \bibliographystyle{plainnat}
 
 \small
-\bibliography{catch}
+\bibliography
 
 
 
