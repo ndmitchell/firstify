@@ -24,7 +24,7 @@ opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
     ,Option "M" []           (NoArg MitchellOld) "Debugging option (to be removed)"
-    ,Option "s" ["stats"]    (NoArg Stats   ) "Show additional statistics"
+    ,Option "i" ["info"]     (NoArg Stats   ) "Show additional statistics"
     ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
     ,Option "n" ["normal"]   (NoArg Normalise) "Normalise the result by basic inlining"
     ,Option "l" ["log"]      (NoArg Log     ) "Log all final results and statistics"
