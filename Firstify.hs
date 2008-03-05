@@ -15,7 +15,7 @@ import Yhc.Core.Firstify.MitchellOld
 import qualified Data.Map as Map
 
 
-data Actions = Reynolds | Mitchell | Stats | Help | MitchellOld | Normalise
+data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Normalise
              | Output String | MainIs CoreFuncName | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
@@ -23,6 +23,7 @@ data Actions = Reynolds | Mitchell | Stats | Help | MitchellOld | Normalise
 opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
+    ,Option "s" ["super"]    (NoArg Super)    "Perform Super defunctionalisation"
     ,Option "M" []           (NoArg MitchellOld) "Debugging option (to be removed)"
     ,Option "i" ["info"]     (NoArg Stats   ) "Show additional statistics"
     ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
@@ -73,6 +74,10 @@ main = do
     c <- if Mitchell `notElem` acts then return c else do
         putStrLn "Performing Mitchell firstification"
         stats $ (if MitchellOld `elem` acts then mitchellOld else mitchell) c
+
+    c <- if Super `notElem` acts then return c else do
+        putStrLn "Performing Super firstification"
+        stats $ super c
 
     c <- if Reynolds `notElem` acts then return c else do
         putStrLn "Performing Reynold's firstification"
