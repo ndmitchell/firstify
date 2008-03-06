@@ -83,7 +83,8 @@ main = do
         putStrLn "Performing Reynold's firstification"
         stats $ reynolds c
 
-    let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts]
+    let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts] ++
+              ['s' | Super `elem` acts]
     out <- case [o | Output o <- acts] of
                o:_ -> return o
                _ -> findOutput (if null ext then "none" else ext) $ head files
