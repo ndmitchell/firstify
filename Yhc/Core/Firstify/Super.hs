@@ -52,52 +52,43 @@ super c = fromCoreFuncMap c $ core $ flip execState undefined $ do
         foFunc "main"
 
 
-foFunc :: CoreFuncName -> M Int
+foFunc :: CoreFuncName -> M CoreExpr
 foFunc x = do
     s <- get
     func <- return $ coreFuncMap (core s) x
     when (isCoreFunc func && x `Set.notMember` done s && x `Set.notMember` pending s) $ do
         modify $ \s -> s{pending = Set.insert x (pending s)}
-        (args,body) <- liftM fromCoreLam $ fo (coreFuncBody func)
+        (args,body) <- liftM fromCoreLam $ foExpr (coreFuncBody func)
         modify $ \s -> s{core = Map.insert x (CoreFunc x (coreFuncArgs func ++ args) body) (core s)
                         ,pending = Set.delete x (pending s)
                         ,done = Set.insert x (done s)
                         }
-    return $ coreFuncArity $ coreFuncMap (core s) x
+    vs <- getVars $ coreFuncArity $ coreFuncMap (core s) x
+    return $ coreLam vs (coreApp (CoreFun x) (map CoreVar vs))
 
 
-
--- go downwards
--- CoreApp (CoreFun _) _
---     first saturate the call with its arity
---     then look towards templates
+foExpr = transformM fo
 
 
 fo :: CoreExpr -> M CoreExpr
-fo (CoreFun x) = fo (CoreApp (CoreFun x) [])
+fo (CoreFun x) = foFunc x
 
-fo (CoreApp (CoreLam vs x) xs) = fo $
-        CoreApp (CoreLam vs2 x2) xs2
+fo (CoreApp (CoreLam vs x) xs) = do
+        let ap x f n = if null n then return x else fo $ f n x
+        x <- ap x CoreLet (zip vs1 xs1)
+        x <- ap x CoreLam vs2
+        x <- ap x (flip CoreApp) xs2
+        return x
     where
-        x2 = coreLet bind $ replaceFreeVars rep x
-
         n = min (length vs) (length xs)
         (vs1,vs2) = splitAt n vs
         (xs1,xs2) = splitAt n xs
 
-        (rep,bind) = partition isOne (zip vs1 xs1)
-        isOne (v,_) = countFreeVar v x <= 1
 
-
-fo (CoreApp (CoreFun x) xs) = do
-    arity <- foFunc x
-    vs <- getVars $ max 0 (arity - length xs)
-    xs <- return $ xs ++ map CoreVar vs
-    o <- return $ CoreApp (CoreFun x) xs
-
+fo o@(CoreApp (CoreFun x) xs) = do
     s <- get
     let t = templateCreate (isCorePrim . coreFuncMap (core s)) o
-    o <- if t == templateNone then return o else do
+    if t == templateNone then return o else do
         let tfull = templateExpand (`BiMap.lookup` special s) t
             holes = templateHoles o t
         case BiMap.lookupRev t (special s) of
@@ -118,9 +109,21 @@ fo (CoreApp (CoreFun x) xs) = do
                     ,core = Map.insert name fun (core s)
                     }
                 return $ coreApp (CoreFun name) holes
-    return $ coreLam vs o
+
+
+fo (CoreLet bind x) = if any (not . isCoreVar . snd) rep
+                      then trace (show x2) $ foExpr x2 else return x2
+    where
+        x2 = coreLet keep $ replaceFreeVars rep x
+        (rep,keep) = partition (\(v,x) -> isCoreVar x || isHo x) bind
+
+
 
 fo x = descendM fo x
+
+
+
+isHo = any isCoreLam . universe
 
 {-
 
