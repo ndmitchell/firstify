@@ -142,8 +142,8 @@ showStats verbose c = unlines
         ]
     where
         -- PREPARTION
-        uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c]
-        arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c]
+        uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c2]
+        arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c2]
 
         c2 = transformExpr appRules c
 
