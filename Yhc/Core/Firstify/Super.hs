@@ -43,7 +43,8 @@ instance UniqueId S where
 
 
 super :: Core -> Core
-super c = fromCoreFuncMap c $ core $ flip execState undefined $ do
+super c = coreReachable ["main"] $ fromCoreFuncMap c $ core $
+    flip execState undefined $ do
         c <- return $ ensureInvariants [NoRecursiveLet,NoCorePos] c
         let s0 = S Set.empty Set.empty undefined BiMap.empty () 0 (uniqueFuncsNext c)
         put (s0 :: S)
@@ -52,27 +53,31 @@ super c = fromCoreFuncMap c $ core $ flip execState undefined $ do
         foFunc "main"
 
 
-foFunc :: CoreFuncName -> M CoreExpr
+foFunc :: CoreFuncName -> M Int
 foFunc x = do
     s <- get
     func <- return $ coreFuncMap (core s) x
     when (isCoreFunc func && x `Set.notMember` done s && x `Set.notMember` pending s) $ do
         modify $ \s -> s{pending = Set.insert x (pending s)}
-        (args,body) <- liftM fromCoreLam $ foExpr (coreFuncBody func)
+        (args,body) <- liftM fromCoreLam $ foBody (coreFuncBody func)
         modify $ \s -> s{core = Map.insert x (CoreFunc x (coreFuncArgs func ++ args) body) (core s)
                         ,pending = Set.delete x (pending s)
                         ,done = Set.insert x (done s)
                         }
-    vs <- getVars $ coreFuncArity $ coreFuncMap (core s) x
-    return $ coreLam vs (coreApp (CoreFun x) (map CoreVar vs))
+    return $ coreFuncArity $ coreFuncMap (core s) x
 
 
-foExpr = transformM fo
+foBody = transformM fo . funInsideApp
+
+-- invariant: all CoreFun's must be inside a CoreApp
+funInsideApp = transform f
+    where
+        f (CoreFun x) = CoreApp (CoreFun x) []
+        f (CoreApp (CoreApp x y) z) = CoreApp x (y++z)
+        f x = x
 
 
 fo :: CoreExpr -> M CoreExpr
-fo (CoreFun x) = foFunc x
-
 fo (CoreApp (CoreLam vs x) xs) = do
         let ap x f n = if null n then return x else fo $ f n x
         x <- ap x CoreLet (zip vs1 xs1)
@@ -85,10 +90,15 @@ fo (CoreApp (CoreLam vs x) xs) = do
         (xs1,xs2) = splitAt n xs
 
 
-fo o@(CoreApp (CoreFun x) xs) = do
+fo (CoreApp (CoreFun x) xs) = do
+    arity <- foFunc x
+    vs <- getVars $ max 0 (arity - length xs)
+    xs <- return $ xs ++ map CoreVar vs
+    o <- return $ CoreApp (CoreFun x) xs
+
     s <- get
     let t = templateCreate (isCorePrim . coreFuncMap (core s)) o
-    if t == templateNone then return o else do
+    res <- if t == templateNone then return o else do
         let tfull = templateExpand (`BiMap.lookup` special s) t
             holes = templateHoles o t
         case BiMap.lookupRev t (special s) of
@@ -108,18 +118,18 @@ fo o@(CoreApp (CoreFun x) xs) = do
                     ,special = BiMap.insert name t (special s)
                     ,core = Map.insert name fun (core s)
                     }
-                return $ coreApp (CoreFun name) holes
+                fo $ coreApp (CoreFun name) holes
+    return $ coreLam vs res
 
 
 fo (CoreLet bind x) = if any (not . isCoreVar . snd) rep
-                      then trace (show x2) $ foExpr x2 else return x2
+                      then transformM fo x2 else return x2
     where
         x2 = coreLet keep $ replaceFreeVars rep x
         (rep,keep) = partition (\(v,x) -> isCoreVar x || isHo x) bind
 
 
-
-fo x = descendM fo x
+fo x = return x
 
 
 
