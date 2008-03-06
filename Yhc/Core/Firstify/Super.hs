@@ -46,35 +46,81 @@ super :: Core -> Core
 super c = fromCoreFuncMap c $ core $ flip execState undefined $ do
         c <- return $ ensureInvariants [NoRecursiveLet,NoCorePos] c
         let s0 = S Set.empty Set.empty undefined BiMap.empty () 0 (uniqueFuncsNext c)
+        put (s0 :: S)
         c <- uniqueBoundVarsCore c
         modify $ \s -> s{core = toCoreFuncMap c}
         foFunc "main"
 
 
-foFunc :: CoreFuncName -> M CoreExpr
+foFunc :: CoreFuncName -> M Int
 foFunc x = do
     s <- get
     func <- return $ coreFuncMap (core s) x
     when (isCoreFunc func && x `Set.notMember` done s && x `Set.notMember` pending s) $ do
         modify $ \s -> s{pending = Set.insert x (pending s)}
-        (args,body) <- liftM fromCoreLam $ foExpr (coreFuncBody func)
+        (args,body) <- liftM fromCoreLam $ fo (coreFuncBody func)
         modify $ \s -> s{core = Map.insert x (CoreFunc x (coreFuncArgs func ++ args) body) (core s)
                         ,pending = Set.delete x (pending s)
                         ,done = Set.insert x (done s)
                         }
-
-    func <- return $ coreFuncMap (core s) x
-    vars <- getVars (coreFuncArity func)
-    return $ CoreLam vars  $CoreApp (CoreFun x) (map CoreVar vars)
+    return $ coreFuncArity $ coreFuncMap (core s) x
 
 
 
-foExpr :: CoreExpr -> M CoreExpr
-foExpr = transformM fo
+-- go downwards
+-- CoreApp (CoreFun _) _
+--     first saturate the call with its arity
+--     then look towards templates
 
 
 fo :: CoreExpr -> M CoreExpr
-fo x = return x
+fo (CoreFun x) = fo (CoreApp (CoreFun x) [])
+
+fo (CoreApp (CoreLam vs x) xs) = fo $
+        CoreApp (CoreLam vs2 x2) xs2
+    where
+        x2 = coreLet bind $ replaceFreeVars rep x
+
+        n = min (length vs) (length xs)
+        (vs1,vs2) = splitAt n vs
+        (xs1,xs2) = splitAt n xs
+
+        (rep,bind) = partition isOne (zip vs1 xs1)
+        isOne (v,_) = countFreeVar v x <= 1
+
+
+fo (CoreApp (CoreFun x) xs) = do
+    arity <- foFunc x
+    vs <- getVars $ max 0 (arity - length xs)
+    xs <- return $ xs ++ map CoreVar vs
+    o <- return $ CoreApp (CoreFun x) xs
+
+    s <- get
+    let t = templateCreate (isCorePrim . coreFuncMap (core s)) o
+    o <- if t == templateNone then return o else do
+        let tfull = templateExpand (`BiMap.lookup` special s) t
+            holes = templateHoles o t
+        case BiMap.lookupRev t (special s) of
+            -- OPTION 1: Not previously done, and a homeomorphic embedding
+            --Nothing | not $ askSpec within tfull (terminate s) -> return x
+            -- OPTION 2: Previously done
+            Just name ->
+                return $ coreApp (CoreFun name) holes
+            -- OPTION 3: New todo
+            done -> do
+                let name = uniqueJoin (templateName t) (funcId s)
+                fun <- templateGenerate (coreFuncMap (core s)) name t
+                modify $ \s -> s
+                    { {-terminate = addSpec name tfull $
+                                   cloneSpec within name $ terminate s
+                      , -} funcId = funcId s + 1
+                    ,special = BiMap.insert name t (special s)
+                    ,core = Map.insert name fun (core s)
+                    }
+                return $ coreApp (CoreFun name) holes
+    return $ coreLam vs o
+
+fo x = descendM fo x
 
 {-
 
