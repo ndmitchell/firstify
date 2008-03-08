@@ -7,6 +7,7 @@ import Debug.Trace
 import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
+import Yhc.Core.Util
 
 
 -- all templates must be at least: CoreApp (CoreFun _) _
@@ -86,3 +87,16 @@ templateGenerate ask newname o@(CoreApp (CoreFun name) xs) = do
     where
         f x | x == templateNone = liftM CoreVar getVar
         f x = return x
+
+
+-- given an expand function, and an existing template, and a new template
+-- return a new template, based on the original, but only if there is an embedding
+templateWeaken :: (Template -> Template) -> Template -> Template -> Template
+templateWeaken expand bad new = f new
+    where
+        bad2 = blurVar bad
+        free = collectFreeVars new
+
+        f x = if blurVar (expand x) == bad2 && null (collectFreeVars x \\ free)
+              then templateNone
+              else descend f x
