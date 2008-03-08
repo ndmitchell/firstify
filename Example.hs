@@ -34,6 +34,10 @@ main5 x = show (x :: Int)
 
 main6 = show [()]
 
+main6_5 = ma id
+ma x = fst (x, ma x)
+
+
 
 -- NOTE: Cannot be firstified
 data Wrap a = Wrap (Wrap a) | Value a
