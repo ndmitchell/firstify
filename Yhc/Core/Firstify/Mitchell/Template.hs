@@ -3,6 +3,7 @@ module Yhc.Core.Firstify.Mitchell.Template where
 
 import Control.Monad.State
 import Data.List
+import Data.Maybe
 import Debug.Trace
 import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
@@ -94,12 +95,30 @@ templateGenerate ask newname o@(CoreApp (CoreFun name) xs) = do
 
 -- given an expand function, and an existing template, and a new template
 -- return a new template, based on the original, but only if there is an embedding
+--
+-- cannot weaken the head of an application without blurring the entire app
+-- must remove a chunk which is variable consistent
+-- remove lambdas if you can
 templateWeaken :: (Template -> Template) -> Template -> Template -> Template
-templateWeaken expand bad new = f new
+templateWeaken expand bad new =
+    case f new of
+        Just (CoreApp x xs) | all (== templateNone) xs -> new
+        Just x -> x
+        Nothing -> new
     where
+        res = f new
         bad2 = blurVar bad
         free = collectFreeVars new
+        safe x = null (collectFreeVars x \\ free)
 
-        f x = if blurVar (expand x) == bad2 && null (collectFreeVars x \\ free)
-              then templateNone
-              else descend f x
+        -- return Nothing to indicate remove but not safe
+        f x | die x || any isNothing cs2 = if safe x then Just templateNone else Nothing
+            | otherwise = Just $ gen $ map fromJust cs2
+            where
+                (cs,gen) = uniplate x
+                cs2 = map f cs
+
+        -- do you want to remove this subexpression
+        die (CoreLam _ x) | die x = True
+        die (CoreApp x xs) | die x = True
+        die x = blurVar (expand x) == bad2
