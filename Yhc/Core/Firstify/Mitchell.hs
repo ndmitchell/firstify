@@ -203,8 +203,9 @@ specialise c = do
                             findCoreFunc name = Map.findWithDefault (new Map.! name) name c
                         fun <- templateGenerate findCoreFunc name t
                         modify $ \(new,s) -> (Map.insert name fun new,
-                             s{terminate = addSpec name tfull $
-                                           cloneSpec within name $ terminate s
+                             s{terminate = cloneSpec within name
+                                         $ addSpec within tfull
+                                         $ terminate s
                               ,funcId = funcId s + 1
                               ,special = BiMap.insert name t (special s)
                               })
