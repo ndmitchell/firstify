@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Debug.Trace
 import Yhc.Core
-import Yhc.Core.Firstify.Mitchell.Util
+import Yhc.Core.Util
 
 
 data Terminate = Terminate

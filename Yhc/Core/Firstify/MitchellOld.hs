@@ -5,7 +5,7 @@ import Yhc.Core hiding (uniqueBoundVarsCore, uniqueBoundVars)
 import Yhc.Core.FreeVar3
 import Yhc.Core.UniqueId
 
-import Yhc.Core.Firstify.Mitchell.Util
+import Yhc.Core.Util
 import Yhc.Core.Firstify.Mitchell.Template
 import qualified Yhc.Core.Firstify.Mitchell.BiMap as BiMap
 
