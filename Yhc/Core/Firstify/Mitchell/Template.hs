@@ -25,14 +25,17 @@ templateCreate isPrim o@(CoreApp (CoreFun x) xs)
         | isPrim x && res /= templateNone = trace ("Warning: primitive HO call, " ++ x) templateNone
         | otherwise = res
     where
-        res = templateCheck o
+        res = templateNorm $ templateCheck o
 
 templateCreate _ _ = templateNone
 
 
+templateNorm :: Template -> Template
+templateNorm = flip evalState (1 :: Int) . uniqueBoundVars
+
+
 templateCheck :: CoreExpr -> Template
-templateCheck o@(CoreApp (CoreFun x) xs) = flip evalState (1 :: Int) $
-        uniqueBoundVars $ join (CoreApp (CoreFun x)) (map f xs)
+templateCheck o@(CoreApp (CoreFun x) xs) = join (CoreApp (CoreFun x)) (map f xs)
     where
         free = collectFreeVars o
         f (CoreLam vs x) = CoreLam vs (f x)
