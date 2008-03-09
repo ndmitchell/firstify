@@ -117,7 +117,11 @@ simplify c = return . applyFuncCoreMap g =<< transformExprM f c
                 x <- transformM f x
                 return $ coreLet good x
             where
-                (bad,good) = partition (any isCoreLam . universe . snd) bind
+                (bad,good) = partition (any h . universe . snd) bind
+
+                h (CoreFun x) | isCoreFunc res && boxedLambda (coreFuncBody res) = True
+                    where res = c Map.! x 
+                h x = isCoreLam x
 
                 g (CoreVar x) = case lookup x bad of
                                     Nothing -> return $ CoreVar x
@@ -146,26 +150,38 @@ simplify c = return . applyFuncCoreMap g =<< transformExprM f c
 
 
 -- BEFORE: box = [even]
--- AFTER:  all uses of box are inlined
+--         foo = box
+-- AFTER: all uses of box as a case scrutinee are inlined
+--        all uses of foo are inlined
 inline :: CoreFuncMap -> SS CoreFuncMap
 inline c = do
     s <- get
-    let todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- Map.elems c
+    let boxy = Map.fromList [(name,(True, coreLam args body)) | CoreFunc name args body <- Map.elems c
                             ,boxedLambda body]
-    if Map.null todo
+        fwd  = Map.fromList [(name,(False,coreLam args body)) | CoreFunc name args body <- Map.elems c
+                            ,Just x <- [simpleForward body], x `Map.member` boxy]
+        both = Map.union boxy fwd
+    if Map.null both
         then return c
-        else applyFuncBodyCoreMapM (\name -> transformM (f (terminate s) todo name)) c
+        else applyFuncBodyCoreMapM (\name -> transformM (f (terminate s) both name)) c
     where
-        -- note: deliberately use term from BEFORE this state
-        -- so you keep inlining many times per call
-        f term mp name (CoreFun x)
-            | x `Map.member` mp && askInline name x term
-            = do modify $ \s -> s{terminate = addInline name x (terminate s)}
-                 y <- duplicateExpr $ mp Map.! x
-                 -- try and inline in the context of the person you are grabbing from
-                 transformM (f term (Map.delete x mp) x) y
+        f term both within o = case o of
+            CoreCase (CoreFun x) alts -> f term both within $ CoreCase (CoreApp (CoreFun x) []) alts
+            CoreCase (CoreApp (CoreFun x) xs) alts | test x True -> do
+                res <- inline x
+                return $ CoreCase (coreApp res xs) alts
+            CoreCase (CoreApp (CoreFun x) []) alts -> return $ CoreCase (CoreFun x) alts
+            CoreFun x | test x False -> inline x
+            _ -> return o
+            where
+                test x b = maybe False ((==) b . fst) $ Map.lookup x both
 
-        f term mp name x = return x
+                inline name | askInline within name term = do
+                    modify $ \s -> s{terminate = addInline within name (terminate s)}
+                    y <- duplicateExpr $ snd $ both Map.! name
+                    -- try and inline in the context of the person you are grabbing from
+                    transformM (f term (Map.delete name both) name) y
+                inline name = return $ CoreFun name
 
 
 -- is a boxed lambda if there is a lambda before you get to a function
@@ -176,6 +192,12 @@ boxedLambda = any isCoreLam . universe . transform f
         f (CoreApp (CoreFun x) _) = CoreFun x
         f x = x
 
+
+-- is this function an absolutely trivialy forwarder
+simpleForward :: CoreExpr -> Maybe CoreFuncName
+simpleForward (CoreFun x) = Just x
+simpleForward (CoreLet _ x) = simpleForward x
+simpleForward _ = Nothing
 
 
 -- BEFORE: map even x
@@ -189,6 +211,7 @@ specialise c = do
         return $ c `Map.union` new
     where
         isPrim x = maybe False isCorePrim $ Map.lookup x c
+        isBoxy x = not (isPrim x) && maybe False (boxedLambda . coreFuncBody) (Map.lookup x c)
 
         f within x | t /= templateNone = do
                 (new,s) <- get
@@ -213,6 +236,6 @@ specialise c = do
                               ,special = BiMap.insert name t (special s)
                               })
                         return $ coreApp (CoreFun name) holes
-            where t = templateCreate isPrim (const False) x
+            where t = templateCreate isPrim isBoxy x
 
         f name x = return x
