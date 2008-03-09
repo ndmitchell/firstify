@@ -1,7 +1,10 @@
 @ECHO OFF
+if "%1" == "goto" shift && goto continue
 
-if not "%1" == "" goto continue
-for %%i in (imaginary) do for %%j in (yca\%%i\*.yca) do call %0 %%j
+REM If they enter nothing, do all the benchmarks
+set def=imaginary,spectral,real
+if not "%1" == "" set def=%1
+for %%i in (%def%) do for %%j in (yca\%%i\*.yca) do call %0 goto %%j
 goto end
 
 :continue
