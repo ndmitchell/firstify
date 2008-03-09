@@ -98,3 +98,7 @@ main17 s = lines' s id
 
 
 main18 s = sort (s :: [Int])
+
+main19 xs = mapM putChar xs
+
+main20 xs = mapM_ putChar xs
