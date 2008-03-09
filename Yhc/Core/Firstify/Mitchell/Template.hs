@@ -40,7 +40,7 @@ templateCheck o@(CoreApp (CoreFun x) xs) = join (CoreApp (CoreFun x)) (map f xs)
     where
         free = collectFreeVars o
         f (CoreLam vs x) = CoreLam vs (f x)
-        f (CoreVar x) = if x `elem` free then templateNone else CoreVar x
+        f (CoreVar x) | x `notElem` free = CoreVar x
         f (CoreApp x xs) | isCoreCon x || isCoreFun x = join (CoreApp x) (map f xs)
         f x = join generate (map f children)
             where (children,generate) = uniplate x
