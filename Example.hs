@@ -3,6 +3,7 @@ module Example where
 
 import Array
 import YHC.Primitive
+import Data.List
 
 
 int0 = 0 :: Int
@@ -94,3 +95,6 @@ main17 s = lines' s id
   lines' []             acc = [acc []]
   lines' ('\n':s)       acc = acc ['\n'] : lines' s id  -- Unix
   lines' (c:s)          acc = lines' s (acc . (c:))
+
+
+main18 s = sort (s :: [Int])
