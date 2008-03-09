@@ -91,7 +91,7 @@ main = do
                _ -> findOutput (if null ext then "none" else ext) $ head files
 
     when (Log `elem` acts) $
-        appendFile "log.txt" $ unlines [unwords args, showStats verbose c]
+        appendFile "log.txt" $ unlines [unwords args, showStats False c]
 
     c <- return $ if Normalise `notElem` acts then c else
                   coreReachable ["main"] $ coreInline InlineForward c
