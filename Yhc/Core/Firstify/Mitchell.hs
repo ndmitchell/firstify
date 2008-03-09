@@ -128,7 +128,7 @@ simplify c = return . applyFuncCoreMap g =<< transformExprM f c
                                     Just y -> duplicateExpr y
                 g x = return x
 
-        f (CoreCase on@(CoreApp (CoreCon x) xs) alts) | any isCoreLam $ universe on =
+        f (CoreCase on@(CoreApp (CoreCon x) xs) alts) =
                 transformM f $ head $ concatMap g alts
             where
                 g (PatDefault, y) = [y]
