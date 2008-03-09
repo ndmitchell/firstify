@@ -16,7 +16,7 @@ import qualified Data.Map as Map
 
 
 data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Normalise
-             | Output String | MainIs CoreFuncName | Text | Html | Verbose | Log
+             | Output String | MainIs CoreFuncName | OutCore | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
 
@@ -30,6 +30,7 @@ opts =
     ,Option "n" ["normal"]   (NoArg Normalise) "Normalise the result by basic inlining"
     ,Option "l" ["log"]      (NoArg Log     ) "Log all final results and statistics"
     ,Option "o" []     (ReqArg Output "file") "Where to put the output file"
+    ,Option "c" ["core"]     (NoArg OutCore ) "Output a Core file"
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
     ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
     ,Option "?" ["help"]     (NoArg Help    ) "Show help message"
@@ -96,7 +97,7 @@ main = do
                   coreReachable ["main"] $ coreInline InlineForward c
 
     putStrLn "Writing result"
-    saveCore out c
+    when (OutCore `elem` acts) $ saveCore out c
     when (Text `elem` acts) $ writeFile (out <.> "txt") (show c)
     when (Html `elem` acts) $ writeFile (out <.> "htm") (coreHtml c)
 
