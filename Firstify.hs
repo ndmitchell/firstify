@@ -143,6 +143,7 @@ showStats verbose c = unlines
         ,"Under-Sat funs : " ++ show3 under
         ,"Over -Sat calls: " ++ show2 over
         ,"Over -Sat funs : " ++ show3 over
+        ,if lambCount == 0 then "success" else "FAILURE"
         ]
     where
         -- PREPARTION
@@ -166,6 +167,7 @@ showStats verbose c = unlines
                 isHOApp _ = False
 
         lamb = [(name, length $ filter isCoreLam inner) | (name,inner) <- uni]
+        lambCount = sum $ map snd lamb
 
         show1 xs = pad (sum $ map snd xs) ++ verb xs
 
