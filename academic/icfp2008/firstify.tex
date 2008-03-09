@@ -761,6 +761,41 @@ Using homeomorphic embedding on the previous example, we would generate the foll
 
 
 
+\section{Notes}
+
+\subsection{Ascending from sort}
+
+Before:
+
+\begin{code}
+ascending  b (a:) xs
+
+ascending a as (b:bs)
+  | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
+ascending a as bs   = as [a]: sequences bs
+\end{code}
+
+After:
+
+\begin{code}
+ascending  b [a] xs
+
+ascending a as (b:bs)
+  | a `cmp` b /= GT = ascending b (a:as) bs
+ascending a as bs   = rev2 as [a] : sequences bs
+\end{code}
+
+\subsection{Dictionary Repeating}
+
+\begin{code}
+main6_5 y = ma id y
+ma x y = fst (x, ma x) y
+\end{code}
+
+We tried blurring, but that doesn't work either.
+
+
+
 
 
 \section{Results}
