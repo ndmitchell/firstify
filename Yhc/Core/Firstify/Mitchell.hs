@@ -197,6 +197,7 @@ boxedLambda = any isCoreLam . universe . transform f
 simpleForward :: CoreExpr -> Maybe CoreFuncName
 simpleForward (CoreFun x) = Just x
 simpleForward (CoreLet _ x) = simpleForward x
+simpleForward (CoreApp x _) = simpleForward x
 simpleForward _ = Nothing
 
 
