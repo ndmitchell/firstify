@@ -34,8 +34,12 @@ main5 x = show (x :: Int)
 
 main6 = show [()]
 
-main6_5 = ma id
-ma x = fst (x, ma x)
+main6_1 = show (Just [()])
+
+
+-- actually, this is UNRELATED to 6
+main6_5 y = ma id y
+ma x y = fst (x, ma x) y
 
 
 
