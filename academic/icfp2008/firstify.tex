@@ -213,7 +213,7 @@ The recursive call in |map| is replaced by a recursive call to the specialised v
 
 \subsection{Goals}
 
-Often these techniques will need to be used in combination, for example the |incList| example required both arity raising and specialisation. The challenge is to apply these methods in a way that removes the most higher order functions. 
+Often these techniques will need to be used in combination, for example the |incList| example required both arity raising and specialisation. The challenge is to apply these methods in a way that removes the most higher order functions.
 
 In combining out methods we define have defined a number of goals, in order of priority.
 
@@ -226,6 +226,8 @@ Given a program, we can remove all data structures by Church encoding \cite{chur
 It is therefore clear that we will not be able to remove all functional values, and meet this goal. We choose therefore to not be complete. If a totally first-order program is required, Reynold's method can be always be applied to the result of our transformation.
 
 By composing our transformation out of three existing transformations, none of which introduce data structures, we can easily ensure that our resultant transformation does not.
+
+\paragraph{Correspondence to the original program.} Since our transformation designed to be performed before analysis, it is important that the results of the analysis can be presented in terms of the original program. We provide a method for transforming expressions in the resultant program into equivalent expressions in the original program.
 
 \paragraph{Remove all functional values.} We have already indicated that the removal of all functional values is an impossible goal within our previous constraints. However, we will attempt to remove as many functional values as possible. In \S? we prove that our basic method is capable of removing all functional values, but that once our termination restrictions have been imposed, this is no longer true.
 
@@ -447,9 +449,29 @@ The loss of sharing is not purely theoretical, the Uniplate library \cite{unipla
 
 \subsection{Inlining (|inline|)}
 
-After inserting additional lambda expressions, and performing simplification, there may still be residual lambda expressions which are not at the top level of a function. The simplification rules will promote lambda expressions up above let expressions and case expressions. With the additional rules, the only residual lambda expressions will be as arguments to either a constructor, or a function. The inline stage deals with lambda expressions which are residual to a constructor at the top level, the specialise stage deals with all remaining lambda expressions.
+We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
 
-We inline a function only into application sites where it a case scrutinee. We only inline functions whose result is a functional value wrapped within a constructor.
+In order to define more precisely what is inlined, it is necessary to define the concept of the kernel of an expression. The kernel of an expression |x| is a subexpression starting from |x|, taking the head of all applications and the inner expression of all let expressions. For example the kernel of |let one = 1 in x| is |x|, the kernel of |(\v -> v) x| is |(\v -> v)|. The purpose of the kernel is that it is the first thing that will be evaluated at runtime, but has no additional context. The concept can be expressed clearly in code:
+
+\begin{code}
+kernel (let v = x in y)  = kernel y
+kernel (x xs_)           = kernel x
+kernel x                 = x
+\end{code}
+
+We inline a function |f| if the kernel of the body of |f| is a constructor, possibly containing a succession of kernels who are constructors, ultimately holding a lambda. We can also inline functions who call boxed lambdas.
+
+The boxed lambda function must follow all function calls, i.e. |Maybe boxed| must follow |boxed| to check if it is a function that evaluates to a boxed lambda. We can keep a seen checkbox, which is sufficient for detecting boxed lambdas.
+
+What if a case returns one of two boxed lambdas? Then you still inline it. The definition is actually defined negatively, if there is not a function call in the way, assume it is a boxed lambda. Need to define positively to get the proofs working.
+
+
+
+
+We define the kernel of an expression as the 
+
+
+More specifically, we inline a function 
 
 \begin{example}
 Given a program making use of type class dictionaries, we may end up with the following code:
@@ -867,6 +889,16 @@ f x = case (let v = 1 in Lambda_Box) of ...
 \end{code}
 
 actually occurs in circsim. The case/let rule fixes this.
+
+\subsection{Don't inline too eagerly}
+
+\begin{code}
+main11 xs = app (gen xs)
+app [] = []
+app (x:xs) = x (1::Int) : app xs
+gen [] = []
+gen (x:xs) = const x : gen xs
+\end{code}
 
 
 
