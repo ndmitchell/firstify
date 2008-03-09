@@ -794,7 +794,13 @@ ma x y = fst (x, ma x) y
 
 We tried blurring, but that doesn't work either.
 
+\subsection{Let's interferring with inlining}
 
+\begin{code}
+f x = case (let v = 1 in Lambda_Box) of ...
+\end{code}
+
+actually occurs in circsim. The case/let rule fixes this.
 
 
 

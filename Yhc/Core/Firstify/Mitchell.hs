@@ -105,6 +105,10 @@ simplify c = return . applyFuncCoreMap g =<< transformExprM f c
                 (rep,bind) = partition (\(a,b) -> isCoreVar b || countFreeVar a x <= 1) (zip vs1 ys1)
                 x2 = coreLet bind $ replaceFreeVars rep x
 
+        f (CoreCase (CoreLet bind on) alts) = do
+            cas <- f $ CoreCase on alts
+            f $ CoreLet bind cas
+
         f (CoreCase on alts) | not $ null ar = do
                 vs <- getVars $ maximum ar
                 transformExprM f $ CoreLam vs $ CoreCase on
