@@ -25,7 +25,7 @@ data Term = Term
     }
 
 
-homeoOrder = 4 :: Int
+homeoOrder = 20 :: Int
 
 insertH key val [] = error "Logic fault, insertH"
 insertH key val (x:xs) | isNothing (H.findOne key x) = H.insert key val x : xs
