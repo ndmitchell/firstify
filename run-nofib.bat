@@ -6,6 +6,6 @@ goto end
 
 :continue
 echo Processing %1
-firstify %1 -himl > %1.txt 2>&1
+firstify %1 -himlv > %1.txt 2>&1
 
 :end
