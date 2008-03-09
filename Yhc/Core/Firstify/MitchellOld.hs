@@ -214,6 +214,6 @@ specialise c = do
                         return $ {-  trace
                             ("Specialising as " ++ name ++ " " ++ show tfull) $ -}
                             coreApp (CoreFun name) holes
-            where t = templateCreate (const False) x
+            where t = templateCreate (const False) (const False) x
 
         g homeo x = return x

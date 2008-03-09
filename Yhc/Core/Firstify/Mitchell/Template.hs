@@ -20,26 +20,28 @@ templateNone = CoreVar "_"
 
 -- given an expression, what would be the matching template
 -- must be careful to avoid if there is an inner template not redoing it
-templateCreate :: (CoreFuncName -> Bool) -> CoreExpr -> Template
-templateCreate isPrim o@(CoreApp (CoreFun x) xs)
-        | any ((/=) templateNone . templateCheck) $ tail $ universe o = templateNone
+templateCreate :: (CoreFuncName -> Bool) -> (CoreFuncName -> Bool) -> CoreExpr -> Template
+templateCreate isPrim isHO o@(CoreApp (CoreFun x) xs)
+        | any ((/=) templateNone . templateCheck isHO) $ tail $ universe o = templateNone
         | isPrim x && res /= templateNone = trace ("Warning: primitive HO call, " ++ x) templateNone
         | otherwise = res
     where
-        res = templateNorm $ templateCheck o
+        res = templateNorm $ templateCheck isHO o
 
-templateCreate _ _ = templateNone
+templateCreate _ _ _ = templateNone
 
 
 templateNorm :: Template -> Template
 templateNorm = flip evalState (1 :: Int) . uniqueBoundVars
 
 
-templateCheck :: CoreExpr -> Template
-templateCheck o@(CoreApp (CoreFun x) xs) = join (CoreApp (CoreFun x)) (map f xs)
+templateCheck :: (CoreFuncName -> Bool) -> CoreExpr -> Template
+templateCheck isHO o@(CoreApp (CoreFun x) xs) = join (CoreApp (CoreFun x)) (map f xs)
     where
         free = collectFreeVars o
         f (CoreLam vs x) = CoreLam vs (f x)
+        f (CoreFun x) | isHO x = CoreFun x
+        f (CoreApp (CoreFun x) xs) | isHO x = CoreApp (CoreFun x) (map f xs)
         f (CoreVar x) | x `notElem` free = CoreVar x
         f (CoreApp x xs) | isCoreCon x || isCoreFun x = join (CoreApp x) (map f xs)
         f x = join generate (map f children)
@@ -48,7 +50,7 @@ templateCheck o@(CoreApp (CoreFun x) xs) = join (CoreApp (CoreFun x)) (map f xs)
         join g xs | any (/= templateNone) xs = g xs
                   | otherwise = templateNone
 
-templateCheck _ = templateNone
+templateCheck _ _ = templateNone
 
 
 

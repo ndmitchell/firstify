@@ -213,6 +213,6 @@ specialise c = do
                               ,special = BiMap.insert name t (special s)
                               })
                         return $ coreApp (CoreFun name) holes
-            where t = templateCreate isPrim x
+            where t = templateCreate isPrim (const False) x
 
         f name x = return x

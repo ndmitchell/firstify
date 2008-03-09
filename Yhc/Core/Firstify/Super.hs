@@ -97,7 +97,7 @@ fo (CoreApp (CoreFun x) xs) = do
     o <- return $ CoreApp (CoreFun x) xs
 
     s <- get
-    let t = templateCreate (isCorePrim . coreFuncMap (core s)) o
+    let t = templateCreate (isCorePrim . coreFuncMap (core s)) (const False) o
     res <- if t == templateNone then return o else do
         let tfull = templateExpand (`BiMap.lookup` special s) t
             holes = templateHoles o t
