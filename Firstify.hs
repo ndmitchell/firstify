@@ -9,6 +9,7 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
+import System.IO
 import Yhc.Core
 import Yhc.Core.Firstify
 import Yhc.Core.Firstify.MitchellOld
@@ -67,9 +68,11 @@ main = do
 
     let verbose = Verbose `elem` acts
         stats c = do
-        when (Stats `elem` acts) $
-            putStr $ showStats verbose c
-        return c
+            when (Stats `elem` acts) $ do
+                let msg = showStats verbose c
+                length msg `seq` putStr msg
+                hFlush stdout
+            return c
     stats c
 
     c <- if Mitchell `notElem` acts then return c else do
