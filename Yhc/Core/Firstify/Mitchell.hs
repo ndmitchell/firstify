@@ -151,7 +151,7 @@ inline :: CoreFuncMap -> SS CoreFuncMap
 inline c = do
     s <- get
     let todo = Map.fromList [(name,coreLam args body) | CoreFunc name args body <- Map.elems c
-                            ,shouldInline body]
+                            ,boxedLambda body]
     if Map.null todo
         then return c
         else applyFuncBodyCoreMapM (\name -> transformM (f (terminate s) todo name)) c
@@ -168,10 +168,13 @@ inline c = do
         f term mp name x = return x
 
 
-        -- should inline if there is a lambda before you get to a function
-        shouldInline = any isCoreLam . universe . transform g
-        g (CoreApp (CoreFun x) _) = CoreFun x
-        g x = x
+-- is a boxed lambda if there is a lambda before you get to a function
+-- assume simplify/promote/lambda have all been fixed pointed
+boxedLambda :: CoreExpr -> Bool
+boxedLambda = any isCoreLam . universe . transform f
+    where
+        f (CoreApp (CoreFun x) _) = CoreFun x
+        f x = x
 
 
 
