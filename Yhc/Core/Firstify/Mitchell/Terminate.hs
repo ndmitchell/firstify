@@ -8,6 +8,7 @@ module Yhc.Core.Firstify.Mitchell.Terminate(
 import qualified Data.Homeomorphic as H
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Maybe
 import Debug.Trace
 import Yhc.Core
 import Yhc.Core.Util
@@ -19,9 +20,20 @@ data Terminate = Terminate
     }
 
 data Term = Term
-    {specs :: H.Homeomorphic CoreExpr1 CoreExpr
+    {specs :: [H.Homeomorphic CoreExpr1 CoreExpr]
     ,inlined :: Set.Set CoreFuncName
     }
+
+
+homeoOrder = 4 :: Int
+
+insertH key val [] = error "Logic fault, insertH"
+insertH key val (x:xs) | isNothing (H.findOne key x) = H.insert key val x : xs
+                       | otherwise = x : insertH key val xs
+
+findH key xs = if any null res then [] else concat res
+    where res = map (H.find key) xs
+
 
 
 get name t = Map.findWithDefault emptyTerm name (terminate t)
@@ -35,7 +47,7 @@ emptyTerminate b = Terminate b Map.empty
 
 
 emptyTerm :: Term
-emptyTerm = Term H.empty Set.empty
+emptyTerm = Term (replicate homeoOrder H.empty) Set.empty
 
 
 addInline :: CoreFuncName -> CoreFuncName -> Terminate -> Terminate
@@ -48,16 +60,16 @@ askInline within on t = logger t ("Skipped inlining of: " ++ on ++ " within " ++
 
 
 addSpec :: CoreFuncName -> CoreExpr -> Terminate -> Terminate
-addSpec within on t = modify t within $ \x -> x{specs = H.insert (specKey on) on $ specs x}
+addSpec within on t = modify t within $ \x -> x{specs = insertH (specKey on) on $ specs x}
 
 specKey = shellify . blurVar
 
 
 askSpec :: CoreFuncName -> CoreExpr -> Terminate -> Bool
 askSpec within on t = logger t ("Skipped spec of:\n" ++ show on ++ "\nbecause of\n" ++ show res) $
-    length res <= 1
+    length res < 1
     where
-        res = H.find (specKey on) $ specs $ get within t
+        res = findH (specKey on) $ specs $ get within t
 
 
 cloneSpec :: CoreFuncName -> CoreFuncName -> Terminate -> Terminate
