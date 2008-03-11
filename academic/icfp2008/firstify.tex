@@ -127,6 +127,8 @@ In Example \ref{ex:incList}, our program is higher-order because of the under-sa
 
 We do not permit primitives in our language, but explain how to extend our method to them in \S?. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S?.
 
+We use |arity f|, |body f| and |args f| to denote the arguments, body and arity of f.
+
 
 \section{Our First-Order Reduction Method}
 
@@ -379,6 +381,12 @@ case c xs_ of {... ; c vs_ -> y ; ...}
     => case x of {p_1 -> y_1 z ; ... ; p_n -> y_n z}
 \end{code}}
 
+\simp{case-let}{
+\begin{code}
+case (let v = x in y) of alts_
+    => let v = x in (case x of alts_)
+\end{code}}
+
 \simp{let-app}{
 \begin{code}
 (let v = x in y) z
@@ -416,7 +424,7 @@ let v = \w -> x in y
 \begin{code}
 let v = x in y
     => y[v / x]
-    where x {-" is a boxed lambda (see \S?) "-}
+    where x {-" \text{ is a boxed lambda (see \S?)} "-}
 \end{code}}
 
 \simp{let-lam}{
@@ -512,10 +520,11 @@ Given a body which is a lambda expression, the arguments to the lambda expressio
 In this particular instance, the introduction of lambda expressions changes the arity of |even| from 0 to 1, possibly requiring applications of |even| to become partially applied, causing |lambdas| to be invoked.
 
 
-\subsection{Inlining (|inline|)}
+\subsection{Inlining}
 
-We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
+We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure ?. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
 
+\begin{figure}
 \begin{code}
 isBoxedLambda (Con c xs_) = any isLambda xs_ || any isBoxedLambda xs_
 isBoxedLambda (App x xs_) = isBoxedLambda x
@@ -523,79 +532,48 @@ isBoxedLambda (Let v x y) = isBoxedLambda y
 isBoxedLambda (Case x alts_) = any isBoxedLambda (rhss alts_)
 isBoxedLambda (Fun x) = isBoxedLambda (body x)
 \end{code}
+\caption{The |isBoxedLambda| function.}
+\label{fig:boxed_lambda}
+\end{figure}
 
-The |isBoxedLambda| check may not terminate, however we can ensure it does by keeping a list of followed functions, and assuming False for each one we have already seen. This does not alter the behaviour.
-
-We also need to inline any boxed lambdas bound at let expressions, using the (bind-box) rule.
-
-
-
-In order to remove functional values, it is useful to detect which expressions evaluate to functional values. If an expression |x| evaluates to a lambda expression, we can indicate this knowledge by wrapping the expression inside a lambda -- given certain restrictions for correctness.
-
-If an expression evaluates to a constructor which contains a functional value within it, there is no equivalent way of expressing this easily. As a result we have introduced boxed lambdas, written |Box x|. The evaluation of |Box x| is identical to the evaluation of |x|. We only introduce a boxed lambda if the result of evaluating |x| is a constructor containing a functional value. We permit a functional value to reside under several constructors.
+We define an expression to be a boxed lambda if the |isBoxedLambda| check returns true. The |isBoxedLambda| as written may not terminate, however we can ensure it does by keeping a list of followed functions, and assuming False for each one we have already seen. This does not decrease the number of true results, but turns non-termination into False.
 
 \begin{example}
+The following examples either are, or are not, boxed lambdas.
+
 \begin{code}
-yes0 = Box [\x -> x]
-yes1 = Box (Maybe [\x -> x])
-yes2 = Box (let y = 1 in [\x -> x])
+yes0 = [\x -> x]
+yes1 = (Just [\x -> x])
+yes2 = (let y = 1 in [\x -> x])
+yes3 = [Nothing, Just (\x -> x)]
+yes4 = yes0
+yes5 = [yes0]
 no0 = \x -> id x
 no1 = [id (\x -> x)]
 no2 = id [\x -> x]
 \end{code}
 
 In this example, we are permitted to enclose the |yes| expressions within a boxed lambda, but none of the others. In |no0| there is no constructor, so the first condition does not apply. In |no1| there is a constructor, but the lambda expression is not an argument to the constructor. In |no2| there is a lambda expression as an argument to a constructor, but that subexpression is an argument to a function application.
+
+Note that the function |no2| evaluates to a boxed lambda, but that this information is hidden by the |id| function. We do not analyse within the |id| function, but assume that specialisation will deal with any boxed lambdas passed to functions.
 \end{example}
 
+We inline if the expression is a boxed lambda, more precisely, we make the following substitution:
 
+\begin{simplify}
 
-
-In order to define more precisely what is inlined, it is necessary to define the concept of the kernel of an expression. The kernel of an expression |x| is a subexpression starting from |x|, taking the head of all applications and the inner expression of all let expressions. For example the kernel of |let one = 1 in x| is |x|, the kernel of |(\v -> v) x| is |(\v -> v)|. The purpose of the kernel is that it is the first thing that will be evaluated at runtime, but has no additional context. The concept can be expressed clearly in code:
-
+\simp{case-boxed}{
 \begin{code}
-kernel (let v = x in y)  = kernel y
-kernel (x xs_)           = kernel x
-kernel x                 = x
-\end{code}
+case (f xs_) alts_
+    => case (let args f = xs_ in body f) alts_
+    where isBoxedLambda body
+\end{code}}
 
-We inline a function |f| if the kernel of the body of |f| is a constructor, possibly containing a succession of kernels who are constructors, ultimately holding a lambda. We can also inline functions who call boxed lambdas.
-
-The boxed lambda function must follow all function calls, i.e. |Maybe boxed| must follow |boxed| to check if it is a function that evaluates to a boxed lambda. We can keep a seen checkbox, which is sufficient for detecting boxed lambdas.
-
-What if a case returns one of two boxed lambdas? Then you still inline it. The definition is actually defined negatively, if there is not a function call in the way, assume it is a boxed lambda. Need to define positively to get the proofs working.
-
-
-
-
-We define the kernel of an expression as the
-
-
-More specifically, we inline a function
-
-\begin{example}
-Given a program making use of type class dictionaries, we may end up with the following code:
-
-\begin{code}
-eqInt = (\x y -> primEqInt x y, \x y -> primNeqInt x y)
-(==) d x y = d x y
-
-main = (==) eqInt 1 2
-\end{code}
-
-Here the lambda expression including |primEqInt| is an argument to the constructor |(,)| in the top-level of |eqInt|. The inline stage will inline the |eqInt| function anywhere it occurs, resulting in:
-
-\begin{code}
-(==) (a,b) x y = a x y
-
-main = (==) (\x y -> primEqInt x y, \x y -> primNeqInt x y) 1 2
-\end{code}
-
-The lambda expressions are still present, but hopefully can be removed using other techniques.
-\end{example}
-
-The general rule is to inline all functions containing a subexpression |alpha|, where: |alpha| is a constructor application with one argument which is a lambda expression; and |alpha| is not a subexpression of any argument to a function application.
+\end{simplify}
 
 The |inline| rule deals with situations where functions evaluate to a data structure containing functional values. This situation occurs regularly with the standard dictionary implementation, but rarely in other situations. The inline rule does not actually remove functional values, but can bring their use and creation closer together, and thus helps them be removed.
+
+The inline stage relies on all functional values being represented by a lambda expression, something that the simplification stage ensures.
 
 There may be some loss of sharing with the inline rule, if a CAF is inlined.
 
@@ -635,7 +613,7 @@ The resulting code has no functional values within it.
 
 \subsubsection{Generating Templates}
 
-A template is generated if an expression is an application to a top-level function, whose arguments include a sub-expression which is a lambda expression. The template includes all sub-expressions whose removal would lead to higher-order elements, or which have free variables from a bound variable.
+A template is generated if an expression is an application to a top-level function, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda. The template includes all sub-expressions whose removal would lead to higher-order elements, or which have free variables from a bound variable.
 
 \begin{example}
 \begin{code}
@@ -693,98 +671,47 @@ map_id v_1 =  let  xs = v_1
 
 We have now eliminated all the functional values from within this operation.
 
-
-\subsubsection{Extending to Primitives}
+\subsection{Extending to Primitives}
 
 The specialisation is the only section that requires extending when working within a language containing primitives. The only restriction is that if a function to be specialised is actually a primitive, no template should be generated. The reason for this is because the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
 
+\section{Examples}
 
-\begin{example}
-\label{ex:ho_elements}
-The following two functions can be thought of as having functional elements:
+To show the boundaries of our method, and the reason certain decisions have been made, we now show several examples.
 
+\begin{examplename}{Dead Code}
 \begin{code}
-even = (.) not odd
+nothing = Nothing
 
-map f x = case  x of
-                []    -> []
-                y:ys  -> f y : map f ys
-\end{code}
+example1 = case  nothing of
+                Nothing  -> 1
+                Just f   -> f (\x -> x)
 
-The |even| function passes |not| and |odd| to the function |(.)|, both of which are functional values. In addition, the |(.)| function, when applied to only two arguments, returns a functional value. The definition of |map| does not create any functional values, but applies the variable |f| to an argument, suggesting that |f| is a functional value.
-\end{example}
-
-We classify higher-order elements as either \textit{creating} or \textit{applying} functional values.
-
-\subsection{Creating Functional Values}
-
-The most obvious way to create a functional value in our Core language is with an explicit lambda expression. The other way is to \textit{curry} or \textit{partially apply} a function, by passing fewer arguments than the arity of the function.
-
-\begin{example}
-\begin{code}
-example1 = (\x -> x) 42
-
-example2 xs = map id xs
-\end{code}
-
-Here |example1| contains an explicit lambda, which is a functional value. In |example2| the function |id| has an arity of 1, but is not given any arguments, and hence is a functional value.
-\end{example}
-
-It is possible for a program to have either one of these syntactic conditions, but at runtime, not create any functional values. Consider the following examples:
-
-\begin{code}
-example1 = case  True of
-                 True   -> 1
-                 False  -> (\x -> x) 2
-
-example2 = x (\y -> y)
-    where x = x
-
-example3 = (error "bang") (\x -> x)
-\end{code}
-
-In |example1| the |True| branch will always be taken due to the known case scrutinee. The |False| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. In |example2| and |example3| the a lambda is applied to |undefined|, so the program will terminate before the lambda is evaluated. These situations can all be thought of as having functional elements in dead code.
-
-
-\subsection{Applying Functional Values}
-
-There are two ways to make use of functional values. The first is to apply an argument to an expression which is not a constructor or a top-level function. The second is to give a function more arguments than its associated arity.
-
-\begin{example}
-\begin{code}
-example1 f = f 42
-
-example2 = even 42
-\end{code}
-
-In |example1| the argument |f| is applied to the value 42, suggesting that |f| is functional. In |example2|, |even| is applied to one argument. Using the definition of |even| from Example \ref{ex:ho_elements}, with arity 0, this causes |even| to be given more arguments than its arity.
-\end{example}
-
-As before, we can construct an example where a functional value is applied, but which never occurs at runtime due to dead code. Another way of constructing an apparent application of a functional value is using |undefined| or a call to |error|.
-
-\begin{example}
-\begin{code}
-example1 = case  Nothing of
+example2 = case  Nothing of
                  Nothing  ->  1
                  Just x   ->  x 1
-
-example2 = error "bang" 42
-
-example3 = x 42
-    where x = x
 \end{code}
 
-In |example1| the value |x| is taken from a data constructor, when we know no value will ever match. In |example2| the |error| primitive is being given two arguments, even though at first glance it appears to only take one. The is possible because the type of error is |String -> alpha|, where |alpha| is completely unconstrained and can be anything, including a functional type. In |example2| the value |42| is being passed to |x|. At runtime |x| will not terminate, and semantically reduces to |undefined|.
-\end{example}
+In |example1| the |Nothing| branch will always be taken due to the known case scrutinee. The |Just| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. Our method cannot remove this lambda. In |example2| the value |x| is taken from a data constructor, when we know no value will ever match.
+\end{examplename}
 
-\subsection{First-Order Core}
-\label{sec:first_order_restrictions}
+\begin{examplename}{Undefined Values}
+\begin{code}
+example1 = x (\y -> y)
+    where x = x
 
-We define a program to be first-order if it contains no expressions of the two types identified as creating functional values. In order to allow the property to be calculated statically, we ignore the issue of dead code.
+example2 = (error "bang") (\x -> x)
 
-There exist programs, or fragments of code, which cannot be reduced to first-order. We present several examples in turn, explaining why first-order reduction is not possible.
+example3 = error "bang" 42
 
-\begin{example}
+example4 = x 42
+    where x = x
+\end{code}
+ 
+In |example1| and |example2| the a lambda is applied to |undefined|, so the program will terminate before the lambda is evaluated. In |example3| the |error| primitive is being given two arguments, even though at first glance it appears to only take one. The is possible because the type of error is |String -> alpha|, where |alpha| is completely unconstrained and can be anything, including a functional type. In |example3| the value |42| is being passed to |x|. At runtime |x| will not terminate, and semantically reduces to |undefined|. We note that |error| is a primitive, unless defined using non-termination.
+\end{examplename}
+
+\begin{examplename}{Root function returning functional values}
 \begin{code}
 main = [id]
 \end{code}
@@ -802,17 +729,17 @@ newtype IO alpha = IO (World -> _E alpha)
 \end{code}
 
 At compilation time the |newtype| wrapper is removed, leaving a function from |World| to |_E alpha|. The |main| argument therefore takes a |World| parameter, before returning a first-order result. We permit the increasing of the arity of |main|.
-\end{example}
+\end{examplename}
 
-\begin{example}
+\begin{examplename}{Root function taking functional values}
 \begin{code}
 main f = f id
 \end{code}
 
 In this example, the |main| function takes a functional argument |f|, which is applied to |id| -- a functional value. Since the interface to |f| is outside the control of the code we are specialising, we cannot change its interface.
-\end{example}
+\end{examplename}
 
-\begin{example}
+\begin{examplename}{Primitives}
 \begin{code}
 main = id `seq` 42
 \end{code}
@@ -820,11 +747,83 @@ main = id `seq` 42
 Here a functional value (|id|) is passed to the primitive |seq|. As we are not able to peer inside the primitive, and must preserve its interface, we cannot remove this functional value. For most primitives, such as arithmetic operations, the types ensure that no functional values are passed as arguments. However, the |seq| primitive is of type |alpha -> beta -> beta|, allowing any type to be passed as either of the arguments, including functional values.
 
 Some primitives not only permit functional values, but actually \textit{require} them. The |primCatch| function within the Yhc standard libraries implements the Haskell exception handling function |catch|. Tye type of |primCatch| is |alpha -> (IOError -> alpha) -> alpha|, taking an exception handler as one of the arguments.
-\end{example}
+\end{examplename}
 
-In all these examples, a functional value must be created as it is required by an interface external to the program under transformation -- either a primitive or the root function. If none of the above cases occurs, then it is always possible to remove all function values from a Core program.
+\begin{examplename}{Functional Lists}
+Sometimes lambda expressions are used to build up lists which can have elements concatenated onto the end. Using Hughes lists (citation from worker/wrapper paper), we can define:
 
-In the following sections we will assume that the root function returns a first-order value, and takes no parameters. We also assume there are no primitive functions. We first present Reynold's method for removing higher-order functions, followed by our method.
+\begin{code}
+nil = id
+snoc x xs = \ys -> xs (x:ys)
+list xs = xs []
+\end{code}
+
+This list representation provides |nil| similarly to |[]| in standard lists, but instead of providing a |(:)| or ``cons'' operation, it provides |snoc| which adds a single element on to the end of the list. The function |list| is provided to create an original list. We are unable to first order reduce such a construction, as it stores the values within the lambda, requiring an infinite amount of lambdas. We have seen such constructions in both the lines function of hscolour, and the sort function of Yhc.
+
+However, there is an alternative implementation of these functions:
+
+\begin{code}
+nil = []
+snoc = (:)
+list = reverse
+\end{code}
+
+We have benchmarked these operations in a variety of settings and the list based version appears to use approximately 75\% of the memory, and 65\% of the time. We suggest that people using continuations for |snoc| move instead to a list type.
+\end{examplename}
+
+
+\begin{examplename}{Inlining Boxed Lambdas}
+Our original program inlined boxed lambdas everywhere they occured. This makes the detection of boxed lambdas much simpler, and does not require looking into external functions. However, it is unable to cope with certain functions:
+
+\begin{code}
+main11 xs = app (gen xs)
+app = map ($ 1)
+gen = map (const x)
+\end{code}
+
+Consider the above code. The function |gen| returns a boxed lambda. However, the code is recursive, so if it was inlined repeatedly, it would not terminate. After deciding to restrict the inlining of gen, we are still left with lambdas. However, by first specialising |app| with respect to |gen|, we are able to remove the functional values. The removal of the lambda expressions has effectively lead to a deforesting between the |gen| producer of cons cells, and the |app| consumer -- eliminating the intermediate lambda expressions in the same step.
+\end{examplename}
+
+
+
+\begin{code}
+ascending  b (a:) xs
+
+ascending a as (b:bs)
+  | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
+ascending a as bs   = as [a]: sequences bs
+\end{code}
+
+After:
+
+\begin{code}
+ascending  b [a] xs
+
+ascending a as (b:bs)
+  | a `cmp` b /= GT = ascending b (a:as) bs
+ascending a as bs   = rev2 as [a] : sequences bs
+\end{code}
+
+\subsection{Dictionary Repeating}
+
+\begin{code}
+main6_5 y = ma id y
+ma x y = fst (x, ma x) y
+\end{code}
+
+We tried blurring, but that doesn't work either.
+
+\subsection{Let's interferring with inlining}
+
+\begin{code}
+f x = case (let v = 1 in Lambda_Box) of ...
+\end{code}
+
+actually occurs in circsim. The case/let rule fixes this.
+
+
+
+
 
 \section{Proof of Completeness}
 
@@ -933,58 +932,6 @@ Using homeomorphic embedding on the previous example, we would generate the foll
 \subsection{Termination as a Whole}
 
 
-
-
-\section{Notes}
-
-\subsection{Ascending from sort}
-
-Before:
-
-\begin{code}
-ascending  b (a:) xs
-
-ascending a as (b:bs)
-  | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
-ascending a as bs   = as [a]: sequences bs
-\end{code}
-
-After:
-
-\begin{code}
-ascending  b [a] xs
-
-ascending a as (b:bs)
-  | a `cmp` b /= GT = ascending b (a:as) bs
-ascending a as bs   = rev2 as [a] : sequences bs
-\end{code}
-
-\subsection{Dictionary Repeating}
-
-\begin{code}
-main6_5 y = ma id y
-ma x y = fst (x, ma x) y
-\end{code}
-
-We tried blurring, but that doesn't work either.
-
-\subsection{Let's interferring with inlining}
-
-\begin{code}
-f x = case (let v = 1 in Lambda_Box) of ...
-\end{code}
-
-actually occurs in circsim. The case/let rule fixes this.
-
-\subsection{Don't inline too eagerly}
-
-\begin{code}
-main11 xs = app (gen xs)
-app [] = []
-app (x:xs) = x (1::Int) : app xs
-gen [] = []
-gen (x:xs) = const x : gen xs
-\end{code}
 
 
 
