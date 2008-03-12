@@ -794,40 +794,199 @@ Consider the above code. The function |gen| returns a boxed lambda. However, the
 
 
 
-\begin{code}
-ascending  b (a:) xs
+\section{Classification of Completeness}
 
-ascending a as (b:bs)
-  | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
-ascending a as bs   = as [a]: sequences bs
-\end{code}
+Our method would be complete if it removed all lambda expressions from a program. This is not possible due to the necessity to terminate, but it is useful to classify what causes of incompleteness come from the fundamental algorithm, ignoring any termination criteria we add later.
 
-After:
+In order to examine the where lambda expressions can reside, we define a grammar for our Core language, and show that the transformations remove possible locations of lambda expressions. First we describe our notation for expressions, then proceed to work with it.
+
+We define a grammar much like a context free grammar. We define the \verb"_" production to be the type of expression that all subexpressions within a program must have. We then define a set of productions corresponding to each type of expression:
 
 \begin{code}
-ascending  b [a] xs
-
-ascending a as (b:bs)
-  | a `cmp` b /= GT = ascending b (a:as) bs
-ascending a as bs   = rev2 as [a] : sequences bs
+\vs_ -> x         == {-" \texttt{L} "-}(x)
+f xs_             == {-" \texttt{f} "-}(body f, x)
+c xs_             == {-" \texttt{C} "-}(x)
+x ys_             == {-" \texttt{a} "-}(x,y)
+v                 == {-" \texttt{v} "-}
+case x of alts_   == {-" \texttt{c} "-}(x,y)
+let v = x in y    == {-" \texttt{l} "-}(x,y)
 \end{code}
 
-\subsection{Dictionary Repeating}
+Need to explain the grammar here. We use a no argument version to denote all the arguments being \verb"_". We write \verb"a b" to denote the union of two grammars, and \verb"a+b" to denote the intersection.
+
+First we start out with the complete grammar:
+
+\begin{verbatim}
+_ = L f C a v c l
+\end{verbatim}
+
+We can't have a functional value as a case expression, and because constructors are all saturated, we can't apply an argument to a constructor. The new pattern of expressions is:
+
+\begin{verbatim}
+_ = L f C a(!C, _) v c(!L, _) l
+\end{verbatim}
+
+We can then factor in the application of the simplification rules, followed by the lambda simplification rules:
+
+\begin{verbatim}
+_ = L f C a(v, _) v c(f a v, _) l
+_ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
+\end{verbatim}
+
+We can now use the results of arity raising.
+
+\begin{verbatim}
+_ = L f(!L, _) C a(v, _) v c(f a v, !L) l(!L, !L)
+\end{verbatim}
+
+We now wish to work with boxes, as defined in |isLambdaBox|. In our framework it is not possible to define \verb"b", since it is defined existentially, but we can define \verb"!b":
+
+\begin{verbatim}
+!b = L f(!b, _) C(!b + !L) a v c(_, !b) l(_, !b)
+\end{verbatim}
+
+We can now apply the box-bind and inlining within case rules:
+
+\begin{verbatim}
+_ = L f(!L, _) C a(v, _) v
+    c(f a v + !b, !L) l(!L + !b, !L)
+\end{verbatim}
+
+We can simplify the let and case rules. We frequently make make use of \verb"!b + !L", so we define the alias \verb"!bL" to denote this.
+
+\begin{verbatim}
+!bL = !b + !L
+    = f(!b, _) C(!bL) a v c(_, !b) l(_, !b)
+
+_ = L f(!L, _) C a(v, _) v
+    c(f a v + !b, !L) l(!bL, !L)
+
+_ = L f(!L, _) C a(v, _) v
+    c(f(!b, _) a v, !L) l(!bL, !L)
+\end{verbatim}
+
+We can implicitly intersect \verb"_" with every term, particularly the f inside the case scrutinee, to give us:
+
+\begin{verbatim}
+_ = L f(!L, _) C a(v, _) v
+    c(f(!bL, _) a v, !L) l(!bL, !L)
+\end{verbatim}
+
+Next we make use of the specialise rule.
+
+\begin{verbatim}
+_ = L f(!L, !bL) C a(v, _) v
+    c(f(!bL, !bL) a v, !L) l(!bL, !L)
+\end{verbatim}
+
+Now we have applied the rules, we wonder where a lambda expression may occur. Concentrating purely on where \verb"L" terms may reside, we end up with:
+
+\begin{verbatim}
+L* = L(L) C(L) a(_, L)
+\end{verbatim}
+
+Now, equally, we ask where \verb"b" can occur.
+
+\begin{verbatim}
+b* = L(b) f(b,_) C(b) a(_,b) c(_, b) l(_, b)
+\end{verbatim}
+
+However, some of these expressions become \verb"b", so they must have a parent which is not a boxed lambda.
+
+\begin{verbatim}
+b* = L(b) a(_,b)
+L* = L(L b) b a(_, L b)
+\end{verbatim}
+
+A lambda must be inside a lambda, or it must be the second argument to an app -- an app must be on a variable, so there can't be any lambda's on a variable which can't get removed -- unless the variable evaluates to bottom or is never evaluated. Therefore the possible remaining lambdas can be in the following places:
 
 \begin{code}
-main6_5 y = ma id y
-ma x y = fst (x, ma x) y
+case v of
+    Just w -> w (\x -> x)
+
+bottom (\x -> x)
+    where bottom = bottom
 \end{code}
 
-We tried blurring, but that doesn't work either.
+In addition, |main| may evaluate to a boxed lambda.
 
-\subsection{Let's interferring with inlining}
+
+%if 0
+
+
+In order to examine this property, we introduce the notion of grammars of expressions. We write a function |expr| that every valid subexpression must satisfy.
 
 \begin{code}
-f x = case (let v = 1 in Lambda_Box) of ...
+expr _ = True
 \end{code}
 
-actually occurs in circsim. The case/let rule fixes this.
+To indicate an entirely unrestricted expression, we write |_|. To indicate a let expression containing a variable we write |let _ var|. For several terms, the |_| represents many different values. For example, in |fun _|, the |_| restricts all of the arguments to a function.
+
+We may think that initially, the grammar of programs is |_|. However, since we know the program is well typed, this ensures that a case does not scrutinise a lambda, and that the first argument of an application is a functional value. In our language all constructor expressions are fully saturated, and evaluate only to data values. These type restrictions mean our initial grammar is:
+
+\begin{code}
+_ = lam | fun | con | app (NOT con)  _ | var | case (NOT lam) _ | let _ _
+\end{code}
+
+After we apply the standard simplification rules we end up with:
+
+\begin{code}
+_ = lam | fun | con | app var  _ | var | case (fun | app | var) _ | let _ _
+\end{code}
+
+Applying the special lambda simplification rules we obtain:
+
+\begin{code}
+_ = lam | fun | con | app var  _ | var | case (fun | app | var) (NOT lam) | let (NOT lam) (NOT lam)
+\end{code}
+
+We can now apply the specialisation rule:
+
+\begin{code}
+_ = lam | fun (NOT lam) | con | app var  _ | var | case (fun | app | var) (NOT lam) | let (NOT lam) (NOT lam)
+\end{code}
+
+We can now introduce |box|. All positive information places must have |box| added. The one exception is |app| as the first argument is a |var|, and a |var| can never be a |box|.
+
+\begin{code}
+box = con (box|lam) | let _ box | case _ box | fun{box} _
+\end{code}
+
+With the restriction that the body of |fun| call must be |box| as well.
+
+
+\begin{code}
+_ = box | lam | fun (NOT lam) | con | app var  _ | var | case (fun|app|var|box) (NOT lam) | let (NOT lam) (NOT lam)
+\end{code}
+
+We can now remove box from |fun| (where it it specialised), and |case|, where it would be inlined, and |let|'s binding, where it would be replaced.
+
+\begin{code}
+_ = box | lam | fun (NOT lam|box) | con | app var  _ | var | case (fun{NOT box}|app|var|box) (NOT lam) | let (NOT lam|box) (NOT lam)
+\end{code}
+
+We now split |con| and |let| and |case| into two variants, |box| and |NOT box|. We additionally split |con| into a |lam| variant as well.
+
+\begin{code}
+_ = box | lam | fun (NOT lam|box) | con (NOT box|lam) | con (box|lam) | app var  _ | var | case (fun|app|var) (NOT lam|box) | case (fun|app|var) box | let (NOT lam|box) (NOT lam|box) | let (NOT lam|box) box
+\end{code}
+
+We can now promote, according to the box rules:
+
+\begin{code}
+_ = box | lam | fun (NOT lam|box) | con (NOT box|lam) | app var  _ | var | case (fun|app|var) (NOT lam|box) | let (NOT lam|box) (NOT lam|box)
+\end{code}
+
+We also know because of inlining and arity raising that a function will never be a lambda, and will never be a box under a case.
+
+\begin{code}
+_ = box | lam | fun{NOT lam} (NOT lam|box) | con (NOT box|lam) | app var  _ | var | case (fun{NOT lam|box} | app | var) (NOT lam|box) | let (NOT lam|box) (NOT lam|box)
+\end{code}
+
+So what may be the parent of a lambda? A lambda may occur within a box, or within a lambda, or as the second argument to an application.
+
+
+
 
 
 
@@ -884,12 +1043,19 @@ Given an expression |v (\v' -> x)|, the variable |v| must evaluate to |undefined
 
 To prove the correctness of the whole argument it is sufficient to show the correctness of each step. The simplification rules are all standard within lazy Core languages. The inlining and specialisation stages are also based on well accepted transformations. the only interesting case, from a correctness perspective, is lambda insertion.
 
-
+%endif
 
 \section{Proof of Termination}
 \label{sec:firstify_terminate}
 
 Our algorithm, as it stands, is not terminating. In order to ensure termination, it is necessary to bound both the inlining and specialisation stages. In this section we develop the termination criteria, by first looking at how non-termination may arise.
+
+\subsection{Termination of Simplification}
+
+
+\subsection{Termination of Arity Raising}
+
+
 
 
 \subsection{Termination of Inlining}
@@ -936,6 +1102,17 @@ In the first iteration, this would generate a version of |f| specialised to |Val
 One simple way to prevent such non-termination is to have a bound on the number of specialisations. Another approach is to use a homeomorphic embedding. All functions relate to some original expression in the Core language, if the expression to be generated was a homeomorphic embedding of an already specialised expression, we can stop.
 
 Using homeomorphic embedding on the previous example, we would generate the following specialised variants of |f (Value head)| and |f (Wrap (Value head))|. Upon attempting to generate the specialised variant |f (Wrap (Wrap (Value head)))| we would abort, with an embedding of |f (Wrap (Value head))|.
+
+
+\subsubsection{Dictionary Repeating}
+
+\begin{code}
+main6_5 y = ma id y
+ma x y = fst (x, ma x) y
+\end{code}
+
+We tried blurring, but that doesn't work either.
+
 
 \subsection{Termination as a Whole}
 
