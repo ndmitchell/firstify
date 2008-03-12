@@ -1,0 +1,66 @@
+Inlining can only occur a finite number of times - easy
+
+Specialisation can only occur a finite number of times - easy
+
+Arity raising can only occur a finite number of times? type based proof????
+assume the arity of any function is finite
+
+
+The rules can only apply a finite number of times:
+
+(fun) is terminating because it increases the arity and there are a finite number of items
+
+The rules form an ordering:
+
+
+0 @(@(x,y),z) => @(x,y+z)
+1 @(f(x,y),z) => f(x,y+z)
+2 @(L(x),y)   => l(y,x)
+3 c(C(x),y)   => l(x,y)
+4 @(c(x,y),z) => c(x,@(y,z))
+5 c(l(x,y),z) => l(x,c(y,z))
+6 @(l(x,y),z) => l(x,@(y,z))
+7 c(x,y)      => L(c(x,@(y,v)))    -- where one y is a lambda
+8 l(x,L(y))   => L(l(x,y))
+9 l(x,y)      => y[v/x]            -- where x is a lambda or a boxed lambda
+
+Need to add case/case to this list!
+
+
+@(@(x,y),z) => @(x,y+z)                     -1@
+@(f(x,y),z) => f(x,y+z)                     -1@
+@(L(x),y)   => l(y,x)                       -1@ -1L +1l
+c(C(x),y)   => l(x,y)                       -1c -1C +1l
+@(c(x,y),z) => c(x,@(y,z))                  
+c(l(x,y),z) => l(x,c(y,z))
+@(l(x,y),z) => l(x,@(y,z))
+c(x,y)      => L(c(x,@(y,v)))
+l(x,L(y))   => L(l(x,y))
+l(x,y)      => y[v/x]
+
+
+0 @(@(x,y),z) => @(x,y+z)                   0   1246
+1 @(f(x,y),z) => f(x,y+z)                   _
+2 @(L(x),y)   => l(y,x)                     89
+3 c(C(x),y)   => l(x,y)                     89
+4 @(c(x,y),z) => c(x,@(y,z))                357
+5 c(l(x,y),z) => l(x,c(y,z))                89
+6 @(l(x,y),z) => l(x,@(y,z))                89
+7 c(x,y)      => L(c(x,@(y,v)))             
+8 l(x,L(y))   => L(l(x,y))
+9 l(x,y)      => y[v/x]
+
+
+Never look at the second component of a 
+
+0 @(@(x,y),z) => @(x,y+z)
+1 @(f(x,y),z) => f(x,y+z)
+2 @(L(x),y)   => l(y,x)
+3 c(C(x),y)   => l(x,y)
+4 @(c(x,y),z) => c(x,@(y,z))
+5 c(l(x,y),z) => l(x,c(y,z))
+6 @(l(x,y),z) => l(x,@(y,z))
+7 c(x,y)      => L(c(x,@(y,v)))    -- where one y is a lambda
+8 l(x,L(y))   => L(l(x,y))
+9 l(x,y)      => y[v/x]            -- where x is a lambda or a boxed lambda
+

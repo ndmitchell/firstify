@@ -1,0 +1,77 @@
+-- Total, no restrictions
+
+_ = L f C @ v c l
+
+-- Restrict by type
+
+_ = L f C @(!C, _) v c(!L, _) l
+
+-- perform basic simplification rules
+
+_ = L f C @(v, _) v c(f @ v, _) l
+
+-- perform lambda simplification
+
+_ = L f C @(v, _) v c(f @ v, !L) l(!L, !L)
+
+-- arity raise
+
+_ = L f(!L, _) C @(v, _) v c(f @ v, !L) l(!L, !L)
+
+-- we introduce b, being the type of boxes
+-- we can't write b in our language, but we can write !b
+
+!b = L f(!b, _) C(!b + !L) @ v c(_, !b) l(_, !b)
+
+!bL = !b + !L
+    = f(!b, _) C(!bL) @ v c(_, !b) l(_, !b)
+
+-- now we apply both the inline and box-bind rules
+
+_ = L f(!L, _) C @(v, _) v c(f @ v + !b, !L) l(!L + !b, !L)
+
+-- we can simplify the let and the case
+
+_ = L f(!L, _) C @(v, _) v c(f @ v + !b, !L) l(!bL, !L)
+
+f @ v + !b = f(!b, _) @ v
+
+_ = L f(!L, _) C @(v, _) v c(f(!b, _) @ v, !L) l(!bL, !L)
+
+-- we can then + the _ with all terms, particularly the f inside the case scrutinee
+
+_ = L f(!L, _) C @(v, _) v c(f(!bL, _) @ v, !L) l(!bL, !L)
+
+-- next we apply the specialise rule
+
+_ = L f(!L, !bL) C @(v, _) v c(f(!bL, !bL) @ v, !L) l(!bL, !L)
+
+-- So where can a lambda occur?
+L* = L(L) C(L) @(_, L)
+
+-- Now where can b occur?
+
+b* = L(b) f(b,_) C(b) @(_,b) c(_, b) l(_, b)
+
+-- nowever, some of these are b, so they must have a parent which is not a b
+
+b* = L(b) @(_,b)
+
+-- note: can't promote f(b,_) if either not called, or root of the entire program
+-- so we are left with
+
+L* = L(L b) @(_, L b)
+
+-- i.e. a lambda must be inside a lambda, or it must be the second argument to an app
+-- an app must be on a variable, so there can't be any lambda's on a variable which can't get removed
+-- unless the variable evaluates to _|_ or is never evaluated:
+
+i.e. we have:
+
+case nothing of
+    Just v -> v (\x -> x)
+
+_|_ (\x -> x)
+
+main = b (note, not lambda)
+
