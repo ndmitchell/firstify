@@ -5,6 +5,7 @@
 \usepackage{natbib}
 
 \include{paper}
+
 %include paper.fmt
 %format +|+ = "\mathbin{\ddagger}"
 %format Lambda = "\Lambda{}"
@@ -17,6 +18,17 @@
 %format Case a b = case a of b
 %format Let a b c = let a = b in c
 
+\newcommand{\simp}[2]{\vspace{-7mm} #2 & (#1) \\}
+\newenvironment{simplify}
+    {\noindent
+     \begin{flushright}
+     \begin{tabular}{p{6.5cm}r}
+    }
+    {\end{tabular}
+     \vspace{-7mm}
+     \end{flushright}
+    }
+
 
 \begin{document}
 
@@ -27,8 +39,8 @@
 \titlebanner{\today{} - \currenttime{}}        % These are ignored unless
 \preprintfooter{}   % 'preprint' option specified.
 
-\title{Defunctionalisation For Analysis}
-\subtitle{ -- transforming away those pesky functional values}
+\title{Loosing functions without gaining data}
+\subtitle{ -- a new method for defunctionalisation}
 
 \authorinfo{Neil Mitchell\titlenote{The first author is supported by an EPSRC PhD studentship}}
            {University of York, UK}
@@ -60,6 +72,11 @@ Higher-order functions are well used and much loved within functional programmin
 \begin{code}
 incList :: Int -> Int
 incList = map (+1)
+
+map :: (alpha -> beta) -> [alpha] -> [beta]
+map f x = case  x of
+                []    -> []
+                y:ys  -> f y : map f ys
 \end{code}
 
 Consider the above definition of |incList|, containing many higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has lead to short code, but we could equally have written:
@@ -290,7 +307,7 @@ Each stage will be described separately. The overall control of the algorithm is
 infixl +|+
 
 (+|+) :: Eq alpha => (alpha -> alpha) -> (alpha -> alpha) -> alpha -> alpha
-(+|+) f g x  = fix (fix x . y)
+(+|+) f g = fix (g . fix f)
 
 fix :: Eq alpha => (alpha -> alpha) -> alpha -> alpha
 fix f x = if x == x' then x else fix f x'
@@ -331,16 +348,6 @@ We describe each of the stages in the algorithm separately. In all subsequent st
 
 
 \subsection{Simplification}
-
-\newcommand{\simp}[2]{\vspace{-7mm} #2 & (#1) \\}
-\newenvironment{simplify}
-    {\begin{flushright}
-     \begin{tabular}{p{6.5cm}r}
-    }
-    {\end{tabular}
-     \vspace{-7mm}
-     \end{flushright}
-    }
 
 \begin{figure}
 \begin{simplify}
@@ -407,16 +414,17 @@ case (let v = x in y) of alts_
 f xs_
     => \v -> f xs_ v
     where arity f > length xs_
+\end{code}}
 
 \simp{case-lam}{
 \begin{code}
 case x of {... ; c vs_ -> \v -> y ; ...}
-    => \w -> case x of {... ; c vs_ -> \v -> y ; ...} w
+    => \z -> case x of {... ; c vs_ -> \v -> y ; ...} z
 \end{code}}
 
 \simp{bind-lam}{
 \begin{code}
-let v = \w -> x in y
+let v = (\w -> x) in y
     => y[v / \w -> x]
 \end{code}}
 
@@ -707,7 +715,7 @@ example3 = error "bang" 42
 example4 = x 42
     where x = x
 \end{code}
- 
+
 In |example1| and |example2| the a lambda is applied to |undefined|, so the program will terminate before the lambda is evaluated. In |example3| the |error| primitive is being given two arguments, even though at first glance it appears to only take one. The is possible because the type of error is |String -> alpha|, where |alpha| is completely unconstrained and can be anything, including a functional type. In |example3| the value |42| is being passed to |x|. At runtime |x| will not terminate, and semantically reduces to |undefined|. We note that |error| is a primitive, unless defined using non-termination.
 \end{examplename}
 
