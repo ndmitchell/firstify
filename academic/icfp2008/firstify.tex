@@ -821,7 +821,7 @@ case x of alts_   => case_ x (map snd alts_)
 let v = x in y    => let_ x y
 \end{code}
 
-We have abstracted away variable names in expressions such as case, let and lambda. Some expressions, such as |app|, have multiple arguments. We have abstracted this away, and use |(app _a _b)| to denote that the first argument to an application is define by |_a|, and that all subsequent arguments are defined by |_b|. In the case of function application, the first argument represents the possible expressions of the body of the function, and the second expression represents the arguments applied to the function. We define compose using the |&+| and |`intersect`| symbols. We define |-| to be grammar subtraction.
+We have abstracted away variable names in expressions such as case, let and lambda. Some expressions, such as |app|, have multiple arguments. We have abstracted this away, and use |(app _a _b)| to denote that the first argument to an application is define by |_a|, and that all subsequent arguments are defined by |_b|. In the case of function application, the first argument represents the possible expressions of the body of the function, and the second expression represents the arguments applied to the function. We compose grammars using |&+|, |&*| and |-| as grammar subtraction.
 
 First we start out with the complete grammar:
 
@@ -831,7 +831,7 @@ _s  =  lam _s &+ fun _s _s &+ con _s &+ app _s _s &+ var &+
        case_ _s _s &+ let_ _s _s
 \end{code}
 
-We know our original program is type safe. This means that the scrutinee of a case may not evaluate to a functional value, and therefore we can discard the |lam| production from the first argument of |case|. Likewise, we know that all constructor expressions are saturated, so will evaluate to a data value, and cannot be the first argument of an application. Modifying our grammar to take account of this, we have:
+We know our original program is type safe. This means that the scrutinee of a case may not evaluate to a functional value, and therefore we can discard the |lam| production from the first argument of |case_|. Likewise, we know that all constructor expressions are saturated, so will evaluate to a data value, and cannot be the first argument of an application. Modifying our grammar to take account of this, we have:
 
 % _ = L f C a(!C, _) v c(!L, _) l
 \begin{code}
@@ -839,7 +839,7 @@ _s  =  lam _s &+ fun _s _s &+ con _s &+ app (_s - con _s) _s &+ var &+
        case_ (_s - lam _s) _s &+ let_ _s _s
 \end{code}
 
-Our simplification rules given in Figure ? are applied until a fixed point is found, meaning that the right hand side of any rule cannot occur in the output. Accounting for these restrictions in the grammar we are left with:
+Our simplification rules given in Figure \ref{fig:simplify} are applied until a fixed point is found, meaning that the left hand side of any rule cannot occur in the output. Accounting for these restrictions in the grammar we are left with:
 
 % _ = L f C a(v, _) v c(f a v, _) l
 \begin{code}
@@ -847,7 +847,7 @@ _s  =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
        case_ (fun _s _s &+ app var _s &+ var) _s &+ let_ _s _s
 \end{code}
 
-Next we apply the lambda rules from Figure ?. As a |_s - lam _s| is a common term we have factored it out as |n_l|.
+Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As |(_s - lam _s)| is a common production we have factored it out as |n_l|.
 
 % _ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
 \begin{code}
@@ -866,18 +866,19 @@ _e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
       case_ (fun n_l _e &+ app var _e &+ var) n_l &+ let_ n_l n_l
 \end{code}
 
-We now wish to work with lambda boxes, as defined in |isLambdaBox|, in Figure ?. Within our grammar rules it is not possible to define that an expression is a lambda box. Consider the definition that a lambda box must be a constructor with a lambda inside. The requirement is for one of the arguments to the constructor to be a lambda, but no restriction is placed on the others. Using our grammar, we have merged all the arguments to a constructor, and cannot define the property that a term is a lambda box in our grammar. We can however define the property that something is \textit{not} a lambda box, which we define with the production:
+We now wish to work with lambda boxes, as defined by the function |isLambdaBox|, from Figure \ref{fig:boxed_lambda}. Within our grammar rules it is not possible to define that an expression is a lambda box. The first expression defined as a lambda box is a constructor where one of the arguments is a lambda, and the other arguments are unrestricted. Using our grammar, we have merged all the arguments to a constructor, and cannot define the property that a term is a lambda box in our grammar. We can however define the property that something is \textit{not} a lambda box, which we define with the production:
 
-% 
+%
 \begin{code}
-n_b  =  _e - box
-     =  lam _e &+ fun n_b _e &+ con (n_b - lam _e) &+ app _e _e &+ var &+
+n_b  =  lam _e &+ fun n_b _e &+ con (n_b - lam _e) &+ app _e _e &+ var &+
         case_ _e n_b &+ let_ _e n_b
 \end{code}
 
 Now if an expression meets |_e|, but not |n_b|, then we know it is a lambda box. We can now make use of the inlining rule and the (bind-box) rules to write:
 
 \begin{code}
+_s   = n_l
+n_l = _e - lam _e
 _e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
       case_ (fun (n_l &* n_b) _e &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
 \end{code}
@@ -885,31 +886,32 @@ _e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
 Now we can make use of the specialise rule, which removes all lambdas and boxed lambdas from the arguments to functions:
 
 \begin{code}
+_s   = n_l
+n_l = _e - lam _e
 _e =  lam _e &+ fun n_l (n_l &* n_b) &+ con _e &+ app var _e &+ var &+
       case_ (fun (n_l &* n_b) (n_l &* n_b) &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
 \end{code}
 
-Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function, because |lam| is not a production in |_s|. If we remove expressions which do not permit a lambda expression as a direct child, and place |?| anywhere a lambda may occur, and |_| in all other places, we are left with:
+Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function, because |lam| is not a production in |_s|. If we restrict our attention only to expressions which permit a lambda expression as a direct child, and add explicit |lam _e| productions where we can, we are left with:
 
 \begin{code}
-_e =  lam ? &+ con ? &+ app _ ?
+_e =  lam (lam _e &+ _e) &+ con (lam _e &+ _e) &+ app var (lam _e &+ _e) &+
+      -- productions not permitting a lambda as a direct child
 \end{code}
 
-A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, we can restrict this further: a constructor with a lambda argument is a lambda box, and we are only permitted lambda boxes in a few places. A lambda box may occur as the root expression of a function (within |_s|), or in the following places:
+A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a lambda box, and therefore is not permitted anywhere |n_b| is intersected with the expression. We can now classify where a lambda box may occur, denoting all expressions as either |_b| to denote that a box may occur, or |n_b| to denote that it may not:
 
 \begin{code}
-_e =  lam ? &+ fun ? _ &+ con ? &+ app _ ? &+ case_ _ ? &+ let_ _ ?
+lam _b &+ fun _b n_b &+ con _b &+ app n_b _b &+ case_ n_b _b &+ let n_b _b
 \end{code}
 
-However, following the definition of a boxed lambda, many of these expressions would in fact be boxed lambdas. Therefore the root of a boxed lambda may occur in fewer places:
+Therefore a constructor containing a lambda may only occur at the root of a function (since |_s| permits boxed lambdas), or in one of the positions outlined above. Assuming no unreachable functions, either the root function of the program must evaluate to a boxed lambda, or there must be an expression which is not an unboxed lambda containing a boxed lambda. Of the above productions, most are boxed lambdas by definition, so the only non-boxed lambdas containing a boxed lambda are:
 
 \begin{code}
-_e =  lam ? &+ app _ ?
+lam _b &+ app n_b _b
 \end{code}
 
-Now we have reduced the possible locations of lambdas. A lambda may occur within a lambda, or as an argument to an application. Additionally a lambda may occur within a constructor, in which case the entire boxed lambda must reside either at the root of a function, or within a lambda or as an application. In a boxed lambda resides at the root of a funciton, it must be the main function, as all |fun| applications within |_e| either do not permit a boxed lambda, or are themseleves a boxed lambda.
-
-If we ignore the root function returning a boxed lambda, any other lambdas must be within an  |app| whose first argument is a variable, and whose other arguments are a lambda. Given this situation, we can be sure that the variable does not bind to a lambda, as the lambda cannot escape. This leads us to the following situations:
+Therefore the root function may be a boxed lambda, with a lambda inside the box. Or a lambda or boxed lambda may occur as inside a lambda, or as the second argument to an application. Given this situation, we can be sure that the variable does not bind to a lambda, as the lambda cannot escape. This leads us to the following situations:
 
 \begin{code}
 case v of
@@ -1064,7 +1066,19 @@ Our algorithm, as it stands, is not terminating. In order to ensure termination,
 
 \subsection{Termination of Simplification}
 
-Todo.
+In order to check the termination of the simplifier we have used the AProVE system \cite{aprove}, to model our rules as term rewrites, and check termination thereon. A simple encoding of our rules is given in Appendix A, which checks basic termination. We have proven termination using both this simple formulation, which considers all constructors to have one alternative of exactly arity one, and a more complex encoding. In both cases, the system is able to report success.
+
+The encoding of the (bind-box) and (bind-lam) rules is excluded. Given these rules, there are non terminating sequences. For example:
+
+\begin{code}
+(\x -> x x) (\x -> x x)
+   => -- (lam-app) rule
+let x = \x -> x x in x x
+   => -- (bind-lam) rule
+(\x -> x x) (\x -> x x)
+\end{code}
+
+These type of expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:simplifier}. However, in practice, we have been unable to take a type correct Haskell program and encode it to trigger an infinite sequence in the simplification stage. In order to ensure this cannot happen, we only perform $n$ (bind-lam) or (bind-box) rules upon an expression. If the expression is altered by other stages, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached.
 
 \subsection{Termination of Arity Raising}
 
@@ -1148,7 +1162,7 @@ fst' y_1 y_2 = y_2
 
 Note that the homoemorphic embedding has prevented us for making a first-order variant of the program.
 \end{example}
- 
+
 While the above example may look slightly obscure, it occurs commonly with the standard desugaring of dictionaries. Often, typeclass dictionaries have default methods, which call other methods in the typeclass. These recursive typeclass calls often pass dictionaries, embedding the original caller -- even though no recursion actually happens.
 
 
@@ -1243,6 +1257,20 @@ Reynold's method has been used as a tool in program calculation \cite{graham_hut
 
 We have developed a method for removing functional values from a program. Our method has good results, and has found practical use within the Catch tool.
 
+
+
+\section*{Appendix A}
+
+\begin{verbatim}
+[x,y,z]
+app(lam(x),y)    -> let(y,x)
+app(case(x,y),z) -> case(x,app(y,z))
+app(let(x,y),z)  -> let(x,app(y,z))
+case(let(x,y),z) -> let(x,case(y,z))
+case(con(x),y)   -> let(x,y)
+case(x,lam(y))   -> lam(case(x,app(lam(y),var)))
+let(lam(x),y)    -> lam(let(x,y))
+\end{verbatim}
 
 
 \bibliographystyle{plainnat}
