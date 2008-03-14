@@ -8,7 +8,18 @@
 
 %include paper.fmt
 %format +|+ = "\mathbin{\ddagger}"
-%format Lambda = "\Lambda{}"
+%format &+ = "\mathbin{\cup}"
+%format &* = "\mathbin{\cap}"
+
+%format _a = "\mathit{a}"
+%format _b = "\mathit{b}"
+%format _e = "\mathit{e}"
+%format _s = "\mathit{s}"
+%format n_l = "!\!\mathit{l}"
+%format n_b = "!\!\mathit{b}"
+
+%format let_ = "\mathsf{let}"
+%format case_ = "\mathsf{case}"
 
 %format Lambda a b = \a -> b
 %format Fun a b = a \? b
@@ -152,7 +163,7 @@ We use |arity f|, |body f| and |args f| to denote the arguments, body and arity 
 Our method works by combining four separate and well-known transformations:
 
 \begin{description}
-\item[Simplification:] We use various standard functional programming simplification rules to perform local transformations within an expression.
+\item[Simplification:] We use various standard functional programming simplification rules to perform local transformations within an expression. \cite{Compilation by Transformation in the Glasgow Haskell Compiler}
 \item[Arity Raising:] A function is arity raised \cite{arity_raising} if by local transformations the arity of a function can be changed, without changing its semantics.
 \item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inline}, and has been studied at length.
 \item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{hudak:removing_type_classes} and more recently to specialisation functions to a given constructor \cite{spj:specconstr}.
@@ -796,119 +807,120 @@ Consider the above code. The function |gen| returns a boxed lambda. However, the
 
 \section{Classification of Completeness}
 
-Our method would be complete if it removed all lambda expressions from a program. This is not possible due to the necessity to terminate, but it is useful to classify what causes of incompleteness come from the fundamental algorithm, ignoring any termination criteria we add later.
+Our method would be complete if it removed all lambda expressions from a program. Completeness is not obtainable given the termination restriction (see \S?). We have two causes of incompleteness: those that come from the fundamental algorithm, and those that are added by any termination criteria in \S?. Here we explore causes arising from our algorithm. We wish to classify where a lambda expression may reside in a program after the application of our firstification method.
 
-In order to examine the where lambda expressions can reside, we define a grammar for our Core language, and show that the transformations remove possible locations of lambda expressions. First we describe our notation for expressions, then proceed to work with it.
-
-We define a grammar much like a context free grammar. We define the \verb"_" production to be the type of expression that all subexpressions within a program must have. We then define a set of productions corresponding to each type of expression:
+To examine where lambda expressions may occur, we model our Core expression language as a context free grammar. We define the start symbol |_s|, and require that the bodies of all functions in our language be defined by the grammar. First we map all expressions onto symbols in our grammar:
 
 \begin{code}
-\vs_ -> x         == {-" \texttt{L} "-}(x)
-f xs_             == {-" \texttt{f} "-}(body f, x)
-c xs_             == {-" \texttt{C} "-}(x)
-x ys_             == {-" \texttt{a} "-}(x,y)
-v                 == {-" \texttt{v} "-}
-case x of alts_   == {-" \texttt{c} "-}(x,y)
-let v = x in y    == {-" \texttt{l} "-}(x,y)
+\vs_ -> x         => lam x
+f xs_             => fun (body f) xs_
+c xs_             => con xs_
+x ys_             => app x ys_
+v                 => var
+case x of alts_   => case_ x (map snd alts_)
+let v = x in y    => let_ x y
 \end{code}
 
-Need to explain the grammar here. We use a no argument version to denote all the arguments being \verb"_". We write \verb"a b" to denote the union of two grammars, and \verb"a+b" to denote the intersection.
+We have abstracted away variable names in expressions such as case, let and lambda. Some expressions, such as |app|, have multiple arguments. We have abstracted this away, and use |(app _a _b)| to denote that the first argument to an application is define by |_a|, and that all subsequent arguments are defined by |_b|. In the case of function application, the first argument represents the possible expressions of the body of the function, and the second expression represents the arguments applied to the function. We define compose using the |&+| and |`intersect`| symbols. We define |-| to be grammar subtraction.
 
 First we start out with the complete grammar:
 
-\begin{verbatim}
-_ = L f C a v c l
-\end{verbatim}
+% _ = L f C a v c l
+\begin{code}
+_s  =  lam _s &+ fun _s _s &+ con _s &+ app _s _s &+ var &+
+       case_ _s _s &+ let_ _s _s
+\end{code}
 
-We can't have a functional value as a case expression, and because constructors are all saturated, we can't apply an argument to a constructor. The new pattern of expressions is:
+We know our original program is type safe. This means that the scrutinee of a case may not evaluate to a functional value, and therefore we can discard the |lam| production from the first argument of |case|. Likewise, we know that all constructor expressions are saturated, so will evaluate to a data value, and cannot be the first argument of an application. Modifying our grammar to take account of this, we have:
 
-\begin{verbatim}
-_ = L f C a(!C, _) v c(!L, _) l
-\end{verbatim}
+% _ = L f C a(!C, _) v c(!L, _) l
+\begin{code}
+_s  =  lam _s &+ fun _s _s &+ con _s &+ app (_s - con _s) _s &+ var &+
+       case_ (_s - lam _s) _s &+ let_ _s _s
+\end{code}
 
-We can then factor in the application of the simplification rules, followed by the lambda simplification rules:
+Our simplification rules given in Figure ? are applied until a fixed point is found, meaning that the right hand side of any rule cannot occur in the output. Accounting for these restrictions in the grammar we are left with:
 
-\begin{verbatim}
-_ = L f C a(v, _) v c(f a v, _) l
-_ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
-\end{verbatim}
+% _ = L f C a(v, _) v c(f a v, _) l
+\begin{code}
+_s  =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
+       case_ (fun _s _s &+ app var _s &+ var) _s &+ let_ _s _s
+\end{code}
 
-We can now use the results of arity raising.
+Next we apply the lambda rules from Figure ?. As a |_s - lam _s| is a common term we have factored it out as |n_l|.
 
-\begin{verbatim}
-_ = L f(!L, _) C a(v, _) v c(f a v, !L) l(!L, !L)
-\end{verbatim}
+% _ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
+\begin{code}
+n_l  =  _s - lam _s
+_s   =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
+        case_(fun _s _s &+ app var _s &+ var) n_l &+ let_ n_l n_l
+\end{code}
 
-We now wish to work with boxes, as defined in |isLambdaBox|. In our framework it is not possible to define \verb"b", since it is defined existentially, but we can define \verb"!b":
+We can now use the results of arity raising, which ensures that every function's root may not be a lambda expression.
 
-\begin{verbatim}
-!b = L f(!b, _) C(!b + !L) a v c(_, !b) l(_, !b)
-\end{verbatim}
+% _ = L f(!L, _) C a(v, _) v c(f a v, !L) l(!L, !L)
+\begin{code}
+_s   = n_l
+n_l = _e - lam _e
+_e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
+      case_ (fun n_l _e &+ app var _e &+ var) n_l &+ let_ n_l n_l
+\end{code}
 
-We can now apply the box-bind and inlining within case rules:
+We now wish to work with lambda boxes, as defined in |isLambdaBox|, in Figure ?. Within our grammar rules it is not possible to define that an expression is a lambda box. Consider the definition that a lambda box must be a constructor with a lambda inside. The requirement is for one of the arguments to the constructor to be a lambda, but no restriction is placed on the others. Using our grammar, we have merged all the arguments to a constructor, and cannot define the property that a term is a lambda box in our grammar. We can however define the property that something is \textit{not} a lambda box, which we define with the production:
 
-\begin{verbatim}
-_ = L f(!L, _) C a(v, _) v
-    c(f a v + !b, !L) l(!L + !b, !L)
-\end{verbatim}
+% 
+\begin{code}
+n_b  =  _e - box
+     =  lam _e &+ fun n_b _e &+ con (n_b - lam _e) &+ app _e _e &+ var &+
+        case_ _e n_b &+ let_ _e n_b
+\end{code}
 
-We can simplify the let and case rules. We frequently make make use of \verb"!b + !L", so we define the alias \verb"!bL" to denote this.
+Now if an expression meets |_e|, but not |n_b|, then we know it is a lambda box. We can now make use of the inlining rule and the (bind-box) rules to write:
 
-\begin{verbatim}
-!bL = !b + !L
-    = f(!b, _) C(!bL) a v c(_, !b) l(_, !b)
+\begin{code}
+_e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
+      case_ (fun (n_l &* n_b) _e &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
+\end{code}
 
-_ = L f(!L, _) C a(v, _) v
-    c(f a v + !b, !L) l(!bL, !L)
+Now we can make use of the specialise rule, which removes all lambdas and boxed lambdas from the arguments to functions:
 
-_ = L f(!L, _) C a(v, _) v
-    c(f(!b, _) a v, !L) l(!bL, !L)
-\end{verbatim}
+\begin{code}
+_e =  lam _e &+ fun n_l (n_l &* n_b) &+ con _e &+ app var _e &+ var &+
+      case_ (fun (n_l &* n_b) (n_l &* n_b) &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
+\end{code}
 
-We can implicitly intersect \verb"_" with every term, particularly the f inside the case scrutinee, to give us:
+Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function, because |lam| is not a production in |_s|. If we remove expressions which do not permit a lambda expression as a direct child, and place |?| anywhere a lambda may occur, and |_| in all other places, we are left with:
 
-\begin{verbatim}
-_ = L f(!L, _) C a(v, _) v
-    c(f(!bL, _) a v, !L) l(!bL, !L)
-\end{verbatim}
+\begin{code}
+_e =  lam ? &+ con ? &+ app _ ?
+\end{code}
 
-Next we make use of the specialise rule.
+A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, we can restrict this further: a constructor with a lambda argument is a lambda box, and we are only permitted lambda boxes in a few places. A lambda box may occur as the root expression of a function (within |_s|), or in the following places:
 
-\begin{verbatim}
-_ = L f(!L, !bL) C a(v, _) v
-    c(f(!bL, !bL) a v, !L) l(!bL, !L)
-\end{verbatim}
+\begin{code}
+_e =  lam ? &+ fun ? _ &+ con ? &+ app _ ? &+ case_ _ ? &+ let_ _ ?
+\end{code}
 
-Now we have applied the rules, we wonder where a lambda expression may occur. Concentrating purely on where \verb"L" terms may reside, we end up with:
+However, following the definition of a boxed lambda, many of these expressions would in fact be boxed lambdas. Therefore the root of a boxed lambda may occur in fewer places:
 
-\begin{verbatim}
-L* = L(L) C(L) a(_, L)
-\end{verbatim}
+\begin{code}
+_e =  lam ? &+ app _ ?
+\end{code}
 
-Now, equally, we ask where \verb"b" can occur.
+Now we have reduced the possible locations of lambdas. A lambda may occur within a lambda, or as an argument to an application. Additionally a lambda may occur within a constructor, in which case the entire boxed lambda must reside either at the root of a function, or within a lambda or as an application. In a boxed lambda resides at the root of a funciton, it must be the main function, as all |fun| applications within |_e| either do not permit a boxed lambda, or are themseleves a boxed lambda.
 
-\begin{verbatim}
-b* = L(b) f(b,_) C(b) a(_,b) c(_, b) l(_, b)
-\end{verbatim}
-
-However, some of these expressions become \verb"b", so they must have a parent which is not a boxed lambda.
-
-\begin{verbatim}
-b* = L(b) a(_,b)
-L* = L(L b) b a(_, L b)
-\end{verbatim}
-
-A lambda must be inside a lambda, or it must be the second argument to an app -- an app must be on a variable, so there can't be any lambda's on a variable which can't get removed -- unless the variable evaluates to bottom or is never evaluated. Therefore the possible remaining lambdas can be in the following places:
+If we ignore the root function returning a boxed lambda, any other lambdas must be within an  |app| whose first argument is a variable, and whose other arguments are a lambda. Given this situation, we can be sure that the variable does not bind to a lambda, as the lambda cannot escape. This leads us to the following situations:
 
 \begin{code}
 case v of
     Just w -> w (\x -> x)
+    Nothing -> 1
 
 bottom (\x -> x)
     where bottom = bottom
 \end{code}
 
-In addition, |main| may evaluate to a boxed lambda.
+In the first case there must be no corresponding |Just| value containing a functional value, so the first branch must be dead code. In the second example, a non-terminating function the first argument of an application, and contains a lambda as an argument to it.
 
 
 %if 0
