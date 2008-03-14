@@ -1064,15 +1064,15 @@ Our algorithm, as it stands, is not terminating. In order to ensure termination,
 
 \subsection{Termination of Simplification}
 
+Todo.
 
 \subsection{Termination of Arity Raising}
 
-
-
+Todo.
 
 \subsection{Termination of Inlining}
 
-The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
+The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example ?. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination. In order to simplify the example we allow the inlining of all boxed lambdas, within as a case scrutinee or not. Similar examples exist with a case, but are substantially more complex.
 
 \begin{example}
 \begin{code}
@@ -1093,11 +1093,7 @@ Any future attempts to inline |f| within this function would be disallowed, alth
 
 \subsection{Termination of Specialisation}
 
-The termination of specialisation can be achieved by using a homeomorphic embedding \ref{sec:homeomorphic}.
-
-The termination of specialisation is more tricky than inlining. We permit the inlining
-
-A natural extension of specialisation is to take the fixed point, eliminating unsaturated expressions in generated functions. Unfortunately, such an algorithm would not terminate.
+The specialisation method, left unrestricted, does not terminate.
 
 \begin{example}
 \begin{code}
@@ -1111,26 +1107,60 @@ main = f (Value head)
 In the first iteration, this would generate a version of |f| specialised to |Value head|. In the second iteration it would specialise |f| with respect to |Wrap (Value head)|, then in the third with |Wrap (Wrap (Value head))|. We would generate an infinite number of specialisations of |f|.
 \end{example}
 
-One simple way to prevent such non-termination is to have a bound on the number of specialisations. Another approach is to use a homeomorphic embedding. All functions relate to some original expression in the Core language, if the expression to be generated was a homeomorphic embedding of an already specialised expression, we can stop.
+\begin{figure}
+\[\frac{s \unlhd t_i \text{ for some } |i|}{s \unlhd \sigma(t_1,\ldots,t_n)} \]
 
-Using homeomorphic embedding on the previous example, we would generate the following specialised variants of |f (Value head)| and |f (Wrap (Value head))|. Upon attempting to generate the specialised variant |f (Wrap (Wrap (Value head)))| we would abort, with an embedding of |f (Wrap (Value head))|.
+\[\frac{\sigma_1 \sim \sigma_2,
+        s_1 \unlhd t_1, \ldots , s_n \unlhd t_n}
+       {\sigma_1 (s_1,\ldots,s_n) \unlhd \sigma_2 (t_1,\ldots,t_n)} \]
+\caption{Homeomorphic embedding relation.}
+\label{fig:homeomorphic}
+\end{figure}
 
+To ensure we only specialise a finite number of times we use a homoemorphic embedding \cite{homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homoemorphic embedding has been used for termination of Supercompilation \cite{sorensen:supercompilation}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
-\subsubsection{Dictionary Repeating}
+For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
 
+One of the conditions for termination of homeomorphic embedding is that there is only a finite alphabet. To help ensure this condition, we consider all variables and literals to be equal. However, this is not sufficient. During the process of specialisation we create new functions, and these new functions are new symbols in our language. Because the homemorphic embedding is being used to ensure that infinite functions are not created, we cannot assume this property when proving it. Instead we only refer to functions in the original input program. Every generated function has a correspondence with an expression in the original program. Before performing the homeomorphic embedding we transform all templates into their original equivalent, then template upon them.
+
+Using homeomorphic embedding on the previous example, we would generate the specialised variant of |f (Value head)|. Upon attempting to generate the specialised variant |f (Wrap (Value head))| we would abort, with an embedding.
+
+While homeomorphic embedding is sufficient to obtain defunctionalisation in many examples, there do exist examples where it terminates prematurely.
+
+\begin{example}
 \begin{code}
-main6_5 y = ma id y
-ma x y = fst (x, ma x) y
+main y = f (\x -> x) y
+f x y = fst (x, f x y) y
 \end{code}
 
-We tried blurring, but that doesn't work either.
+Here we first generate a specialised variant of |f (\x -> x) y|.  If we call the specialised variant |f'|, we have:
 
+\begin{code}
+f' y = fst (\x -> x, f' y) y
+\end{code}
+
+Note that the recursive call to |f| has also been specialised. We now attempt to generate a specialised variant of |fst|, using the template |fst (\x -> x, f' y) y|. Unfortunately, this template is an embedding of the template we used for |f'|, and we do not specialise. If we permit specialisation, we reduce to:
+
+\begin{code}
+f' y = fst' y y
+fst' y_1 y_2 = y_2
+\end{code}
+
+Note that the homoemorphic embedding has prevented us for making a first-order variant of the program.
+\end{example}
+ 
+While the above example may look slightly obscure, it occurs commonly with the standard desugaring of dictionaries. Often, typeclass dictionaries have default methods, which call other methods in the typeclass. These recursive typeclass calls often pass dictionaries, embedding the original caller -- even though no recursion actually happens.
+
+
+To aleviate this problem, instead of storing one set $S$, we instead store a sequence of sets, $S_1$ through $S_n$ -- where $n$ is a small positive number, constant for the duration of the program. Instead of adding to the set $S$, we now added to the lowest set $S_i$ where adding the element will not violate the admissible sequence. Each of the sets $S_i$ is still finite, and there are a finite number ($n$) of them, so termination is maintained.
+
+By default the firstification program uses 8 as the number of sets. In the results table given in \S?, for each program we have given the minimum possible value of $n$ to remove all lambda expressions. The disadvantage of a higher $n$ is that a program will unroll infinite recursion more times.
 
 \subsection{Termination as a Whole}
 
+We call a function |f| finite if it only applies a finite number of times, given a starting program. We call a function |f| terminating if |fix f| terminates. Given |f +||+ g|, if both |f| and |g| are finite then |f +||+ g| is finite. If one if finite, and the other is terminating, then the entire production is terminating.
 
-
-
+We have shown that arity raising, inlining and specialisation are finite. The remaining step, simplification, is terminating. Therefore our entire program is terminating.
 
 \section{Results}
 
