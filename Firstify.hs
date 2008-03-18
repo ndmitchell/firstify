@@ -143,14 +143,17 @@ showStats verbose c = unlines $
         ,"Under-Sat funs : " ++ show3 under
         ,"Over -Sat calls: " ++ show2 over
         ,"Over -Sat funs : " ++ show3 over
+        ,"Functions      : " ++ show (length $ coreFuncs c3)
+        ,"Nodes          : " ++ show (length $ universeExpr c3)
         ,if lambCount == 0 then "success" else "FAILURE"
-        ] ++ size c2 ++ size (coreReachable ["main"] $ coreInline InlineForward c2)
+        ]
     where
         -- PREPARTION
         uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c2]
         arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c2]
 
         c2 = transformExpr appRules c
+        c3 = coreReachable ["main"] $ coreInline InlineForward c2
 
         -- use all the CoreApp properties
         -- plus wrap all CoreFun's in a CoreApp
@@ -191,8 +194,3 @@ showStats verbose c = unlines $
 
         pad x = replicate (8 - length s) ' ' ++ s
             where s = show x
-
-        -- SIZE
-        size c = ["Functions      : " ++ show (length $ coreFuncs c)
-                 ,"Nodes          : " ++ show (length $ universeExpr c)
-                 ]
