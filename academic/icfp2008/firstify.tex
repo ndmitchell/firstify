@@ -15,8 +15,8 @@
 %format _b = "\mathit{b}"
 %format _e = "\mathit{e}"
 %format _s = "\mathit{s}"
-%format n_l = "!\!\mathit{l}"
-%format n_b = "!\!\mathit{b}"
+%format _l' = "\mathit{l}^\prime{}"
+%format _b' = "\mathit{b}^\prime{}"
 
 %format let_ = "\mathsf{let}"
 %format case_ = "\mathsf{case}"
@@ -847,49 +847,49 @@ _s  =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
        case_ (fun _s _s &+ app var _s &+ var) _s &+ let_ _s _s
 \end{code}
 
-Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As |(_s - lam _s)| is a common production we have factored it out as |n_l|.
+Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As |(_s - lam _s)| is a common production we have factored it out as |l'|.
 
 % _ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
 \begin{code}
 n_l  =  _s - lam _s
 _s   =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
-        case_(fun _s _s &+ app var _s &+ var) n_l &+ let_ n_l n_l
+        case_(fun _s _s &+ app var _s &+ var) _l' &+ let_ _l' _l'
 \end{code}
 
 We can now use the results of arity raising, which ensures that every function's root may not be a lambda expression.
 
 % _ = L f(!L, _) C a(v, _) v c(f a v, !L) l(!L, !L)
 \begin{code}
-_s   = n_l
-n_l = _e - lam _e
-_e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
-      case_ (fun n_l _e &+ app var _e &+ var) n_l &+ let_ n_l n_l
+_s   = _l'
+_l' = _e - lam _e
+_e =  lam _e &+ fun _l' _e &+ con _e &+ app var _e &+ var &+
+      case_ (fun _l' _e &+ app var _e &+ var) _l' &+ let_ _l' _l'
 \end{code}
 
 We now wish to work with lambda boxes, as defined by the function |isLambdaBox|, from Figure \ref{fig:boxed_lambda}. Within our grammar rules it is not possible to define that an expression is a lambda box. The first expression defined as a lambda box is a constructor where one of the arguments is a lambda, and the other arguments are unrestricted. Using our grammar, we have merged all the arguments to a constructor, and cannot define the property that a term is a lambda box in our grammar. We can however define the property that something is \textit{not} a lambda box, which we define with the production:
 
 %
 \begin{code}
-n_b  =  lam _e &+ fun n_b _e &+ con (n_b - lam _e) &+ app _e _e &+ var &+
-        case_ _e n_b &+ let_ _e n_b
+_b'  =  lam _e &+ fun _b' _e &+ con (_b' - lam _e) &+ app _e _e &+ var &+
+        case_ _e _b' &+ let_ _e _b'
 \end{code}
 
-Now if an expression meets |_e|, but not |n_b|, then we know it is a lambda box. We can now make use of the inlining rule and the (bind-box) rules to write:
+Now if an expression meets |_e|, but not |_b'|, then we know it is a lambda box. We can now make use of the inlining rule and the (bind-box) rules to write:
 
 \begin{code}
-_s   = n_l
-n_l = _e - lam _e
-_e =  lam _e &+ fun n_l _e &+ con _e &+ app var _e &+ var &+
-      case_ (fun (n_l &* n_b) _e &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
+_s   = _l'
+_l' = _e - lam _e
+_e =  lam _e &+ fun _l' _e &+ con _e &+ app var _e &+ var &+
+      case_ (fun (_l' &* _b') _e &+ app var _e &+ var) _l' &+ let_ (_l' &* _b') _l'
 \end{code}
 
 Now we can make use of the specialise rule, which removes all lambdas and boxed lambdas from the arguments to functions:
 
 \begin{code}
-_s   = n_l
-n_l = _e - lam _e
-_e =  lam _e &+ fun n_l (n_l &* n_b) &+ con _e &+ app var _e &+ var &+
-      case_ (fun (n_l &* n_b) (n_l &* n_b) &+ app var _e &+ var) n_l &+ let_ (n_l &* n_b) n_l
+_s   = _l'
+_l' = _e - lam _e
+_e =  lam _e &+ fun _l' (_l' &* _b') &+ con _e &+ app var _e &+ var &+
+      case_ (fun (_l' &* _b') (_l' &* _b') &+ app var _e &+ var) _l' &+ let_ (_l' &* _b') _l'
 \end{code}
 
 Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function, because |lam| is not a production in |_s|. If we restrict our attention only to expressions which permit a lambda expression as a direct child, and add explicit |lam _e| productions where we can, we are left with:
@@ -899,16 +899,16 @@ _e =  lam (lam _e &+ _e) &+ con (lam _e &+ _e) &+ app var (lam _e &+ _e) &+
       -- productions not permitting a lambda as a direct child
 \end{code}
 
-A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a lambda box, and therefore is not permitted anywhere |n_b| is intersected with the expression. We can now classify where a lambda box may occur, denoting all expressions as either |_b| to denote that a box may occur, or |n_b| to denote that it may not:
+A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a lambda box, and therefore is not permitted anywhere |_b'| is intersected with the expression. We can now classify where a lambda box may occur, denoting all expressions as either |_b| to denote that a box may occur, or |_b'| to denote that it may not:
 
 \begin{code}
-lam _b &+ fun _b n_b &+ con _b &+ app n_b _b &+ case_ n_b _b &+ let n_b _b
+lam _b &+ fun _b _b' &+ con _b &+ app _b' _b &+ case_ _b' _b &+ let _b' _b
 \end{code}
 
 Therefore a constructor containing a lambda may only occur at the root of a function (since |_s| permits boxed lambdas), or in one of the positions outlined above. Assuming no unreachable functions, either the root function of the program must evaluate to a boxed lambda, or there must be an expression which is not an unboxed lambda containing a boxed lambda. Of the above productions, most are boxed lambdas by definition, so the only non-boxed lambdas containing a boxed lambda are:
 
 \begin{code}
-lam _b &+ app n_b _b
+lam _b &+ app _b' _b
 \end{code}
 
 Therefore the root function may be a boxed lambda, with a lambda inside the box. Or a lambda or boxed lambda may occur as inside a lambda, or as the second argument to an application. Given this situation, we can be sure that the variable does not bind to a lambda, as the lambda cannot escape. This leads us to the following situations:
@@ -952,23 +952,30 @@ Todo.
 
 \subsection{Termination of Inlining}
 
-The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example ?. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination. In order to simplify the example we allow the inlining of all boxed lambdas, within as a case scrutinee or not. Similar examples exist with a case, but are substantially more complex.
+The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example ?. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
 
 \begin{example}
 \begin{code}
-f = (\x -> x) : f
+f = case  f of
+          Box _ -> Box (\x -> x)
 \end{code}
 
-The expression bound to |f| will repeatedly grow in size as inlining is applied, and will remain a candidate for inlining.
-\end{example}
-
-Our termination criteria permits inlining a function |f|, at all application sites within a function |g|, but only once per pair |(f,g)|. In the above example we would be permitted to inline |f| within the function |f| at all application sites (only one in this example), once. The resultant code would be:
+The |f| inside the case is a candidate for inlining:
 
 \begin{code}
-f = (\x -> x) : (\x -> x) : f
+case f of Box _ -> Box (\x -> x)
+    => -- inlining rule
+case (case f of Box _ -> Box (\x -> x)) of Box _ -> Box (\x -> x)
+    => -- (case-case) rule
+case f of Box _ -> case Box (\x -> x) of Box _ -> Box (\x -> x)
+    => -- (case-con) rule
+case f of Box _ -> Box (\x -> x)
 \end{code}
 
-Any future attempts to inline |f| within this function would be disallowed, although |f| could be inlined within other functions. This termination criteria is sound, assuming all expressions are finite and there are a finite number of function symbols. Each inlining will occur at only a finite number of application sites, and prohibit that pair of function inlinings occurring in future. Given $n$ functions, there can only be $n^2$ possible inlining steps, each for possibly many application sites.
+This expression could cause non-termination.
+\end{example}
+
+Our termination criteria permits inlining a function |f|, at all application sites within a function |g|, but only once per pair |(f,g)|. In the above example we would be permitted to inline |f| within the function |f| at all application sites (only one in this example), once. Any future attempts to inline |f| within this function would be disallowed, although |f| could be inlined within other functions. This termination criteria is sound, assuming all expressions are finite and there are a finite number of function symbols. Each inlining will occur at only a finite number of application sites, and prohibit that pair of function inlinings occurring in future. Given $n$ functions, there can only be $n^2$ possible inlining steps, each for possibly many application sites.
 
 
 \subsection{Termination of Specialisation}
@@ -1044,7 +1051,62 @@ We have shown that arity raising, inlining and specialisation are finite. The re
 
 \section{Results}
 
-Our preferred method for higher-order function removal is to apply specialisation and inlining interleaved. We have tried our method on the nofib suite, and have the following results.
+We have applied our method to tests drawn from the imaginary and spectral section of the nofib benchmark. We have worked with all 14 tests in the imaginary section, but have restricted our focus to 35 out of the 47 spectral tests. The reason for leaving 12 out is that they do not compile with Yhc, typically due to missing libraries or unimplemented base library functions. The programs that are excluded are not highly higher-order, and we suspect their results would be similar to the remaining ones.
+
+Most analysis operations work on an abstracted view of the program. For example, the underlying IO mechanism of the Yhc standard libraries uses handles and pointers to read files -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of the firstification, we have worked on unmodified Yhc libraries, including all the low-level detail. Some particular places where higher-order functions are used:
+
+\begin{itemize}
+\item The monadic bind operation is higher-order.
+\item The IO monad itself is implemented as a function.
+\item Dictionaries are implemented as tuples of functions.
+\item The Haskell |Show| framework uses continuation passing style extensively.
+\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{list_comps,duncan_deforestation}.
+\end{itemize}
+
+\begin{table*}
+\caption{Table of results}
+\label{tab:results}
+
+\smallskip
+
+\textbf{Name} is the name of the checked program (a starred name indicates that changes were needed before safe pattern-matching could be verified);
+\textbf{Src} is the number of lines in the original source code;
+\textbf{Core} is the total number of lines of Yhc Core, including all functions used from libraries;
+\textbf{First} is the number of lines after firstification, just before analysis;
+\textbf{Err} is the number of calls to |error| (missing pattern cases);
+\textbf{Pre} is the number of functions which have a precondition which is not simply `True';
+\textbf{Sec} is the time taken for transformations and analysis;
+\textbf{Mb} is the maximum residency of the Firstify program at garbage collection time.
+
+\smallskip\smallskip
+
+\begin{tabular*}{\textwidth}{lrrrrrrlll}
+\hspace{-2mm} \textbf{Name} & \textbf{Src} & \textbf{Core} & \textbf{First} & \textbf{Err} & \textbf{Pre} & \textbf{Sec} & \textbf{Mb} \\
+\vspace{-1ex} \\
+\hspace{-2mm} Bernoulli*                   & 35 & 1616 &  652 & 5 & 11 & 4.1 & 0.8 \\
+\hspace{-2mm} Digits of E1*  \hspace{-3mm} & 44 &  957 &  377 & 3 &  8 & 0.3 & 0.6 \\
+\hspace{-2mm} Digits of E2   \hspace{-3mm} & 54 & 1179 &  455 & 5 & 19 & 0.5 & 0.8 \\
+\hspace{-2mm} Exp3-8                       & 29 &  220 &  163 & 0 &  0 & 0.1 & 0.1 \\
+\hspace{-2mm} Gen-Regexps*   \hspace{-3mm} & 41 & 1006 &  776 & 1 &  1 & 0.3 & 0.4 \\
+\hspace{-2mm} Integrate                    & 39 & 2466 &  364 & 3 &  3 & 0.3 & 1.9 \\
+\hspace{-2mm} Paraffins*                   & 91 & 2627 & 1153 & 2 &  2 & 0.8 & 1.9 \\
+\hspace{-2mm} Primes                       & 16 &  302 &  241 & 6 & 13 & 0.2 & 0.1 \\
+\hspace{-2mm} Queens                       & 16 &  648 &  283 & 0 &  0 & 0.2 & 0.2 \\
+\hspace{-2mm} Rfib                         &  9 & 1918 &  100 & 0 &  0 & 0.1 & 1.7 \\
+\hspace{-2mm} Tak                          & 12 &  209 &  155 & 0 &  0 & 0.1 & 0.1 \\
+\hspace{-2mm} Wheel Sieve 1* \hspace{-3mm} & 37 & 1221 &  570 & 7 & 10 & 7.5 & 0.9 \\
+\hspace{-2mm} Wheel Sieve 2* \hspace{-3mm} & 45 & 1397 &  636 & 2 &  2 & 0.3 & 0.6 \\
+\hspace{-2mm} X2n1                         & 10 & 2637 &  331 & 2 &  5 & 1.8 & 1.9 \\
+\vspace{-1ex} \\
+\hspace{-2mm} FiniteMap*    \hspace{-3mm} & 670 & 1484 & 1829 & 13 & 17 & 1.6 & 1.0 \\
+\hspace{-2mm} HsColour*     \hspace{-3mm} & 823 & 5379 & 5060 & 4 &  9 & 2.1 & 2.7 \\
+\hline
+\end{tabular*}
+\end{table*}
+
+All of these factors combine, and a particular torture test is |show (1 :: Double)|. The results are presented in Table \ref{tbl:results}. We have given detailed results for the 14 imaginary benchmarks, and a min/max/average for the spectral suite. The column 
+
+
 
 
 \section{Reynolds style defunctionalization}
@@ -1141,7 +1203,7 @@ GC Nelan - 1991 - Arizona State University
 A higher-order removal method - all 5 versions »
 WN Chin, J Darlington - Higher-Order and Symbolic Computation, 1996 - Springer
 Page 1. LISP AND SYMBOLIC COMPUTATION, 9, 287-322 (t996) @ 1996 Kluwer Academic
-Publishers, Boston. Manufactured in The Netherlands. ... 
+Publishers, Boston. Manufactured in The Netherlands. ...
 
 W.N. Chin and J Darlington, A Higher-Order Removal Method,  Journal of Lisp and Symbolic Computation , Vol 9, 287-322, 1996.
 
@@ -1169,7 +1231,7 @@ SpringerLink Date	Wednesday, June 22, 2005
 
 
 [PS] Defunctionalization of typed programs - all 5 versions »
-JM Bell, J Hook - Oregon Graduate Institute School of Science & Engineering, 1994 - cse.ogi.edu
+JM Bell, J Hook - Oregon Graduate Institute School of Science Engineering, 1994 - cse.ogi.edu
 
 
 Type-driven defunctionalization - all 6 versions »
