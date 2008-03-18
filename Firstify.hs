@@ -140,7 +140,7 @@ showStats verbose c = unlines $
         [sa ++ replicate (25 - length sa - length sb) ' ' ++ sb ++ verb c
             | (sa,(b,c)) <- res, let sb = show b] ++
         [if lambCount == 0 then "success" else "FAILURE"] ++
-        [concat $ intersperse "\t" [show b | (i,(_,(b,_))) <- zip [0..] res, i `notElem` [3,5]] | verbose]
+        ["Summary" ++ concat ["\t" ++ show b | (i,(_,(b,_))) <- zip [0..] res, i `notElem` [3,5]] | verbose]
     where
         res = let (*) = (,) in
             ["HO Applications"  * show1 hoApp
