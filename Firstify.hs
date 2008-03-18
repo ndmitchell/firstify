@@ -135,7 +135,7 @@ replaceMain c name = coreReachable ["main"] c{coreFuncs = concatMap f $ coreFunc
     Over-Sat: reverse of under-sat
 -}
 showStats :: Bool -> Core -> String
-showStats verbose c = unlines
+showStats verbose c = unlines $
         ["Higher-Order Statistics"
         ,"HO Applications: " ++ show1 hoApp
         ,"Lambdas        : " ++ show1 lamb
@@ -144,7 +144,7 @@ showStats verbose c = unlines
         ,"Over -Sat calls: " ++ show2 over
         ,"Over -Sat funs : " ++ show3 over
         ,if lambCount == 0 then "success" else "FAILURE"
-        ]
+        ] ++ size c2 ++ size (coreReachable ["main"] $ coreInline InlineForward c2)
     where
         -- PREPARTION
         uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c2]
@@ -191,3 +191,8 @@ showStats verbose c = unlines
 
         pad x = replicate (8 - length s) ' ' ++ s
             where s = show x
+
+        -- SIZE
+        size c = ["Functions      : " ++ show (length $ coreFuncs c)
+                 ,"Nodes          : " ++ show (length $ universeExpr c)
+                 ]
