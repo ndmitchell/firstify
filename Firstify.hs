@@ -136,18 +136,26 @@ replaceMain c name = coreReachable ["main"] c{coreFuncs = concatMap f $ coreFunc
 -}
 showStats :: Bool -> Core -> String
 showStats verbose c = unlines $
-        ["Higher-Order Statistics"
-        ,"HO Applications: " ++ show1 hoApp
-        ,"Lambdas        : " ++ show1 lamb
-        ,"Under-Sat calls: " ++ show2 under
-        ,"Under-Sat funs : " ++ show3 under
-        ,"Over -Sat calls: " ++ show2 over
-        ,"Over -Sat funs : " ++ show3 over
-        ,"Functions      : " ++ show (length $ coreFuncs c3)
-        ,"Nodes          : " ++ show (length $ universeExpr c3)
-        ,if lambCount == 0 then "success" else "FAILURE"
-        ]
+        "Higher-Order Statistics" :
+        [sa ++ replicate (25 - length sa - length sb) ' ' ++ sb ++ verb c
+            | (sa,(b,c)) <- res, let sb = show b] ++
+        [if lambCount == 0 then "success" else "FAILURE"]
     where
+        res = let (*) = (,) in
+            ["HO Applications"  * show1 hoApp
+            ,"Lambdas"          * show1 lamb
+            ,"Under-Sat calls"  * show2 under
+            ,"Under-Sat funs"   * show3 under
+            ,"Over -Sat calls"  * show2 over
+            ,"Over -Sat funs"   * show3 over
+            ,"Functions"        * (length $ coreFuncs c3, [])
+            ,"Nodes"            * (length $ universeExpr c3, [])
+            ]
+
+        verb info = if verbose && not (null res) then "\n    " ++ unwords res else ""
+            where res = [a ++ "=" ++ show b | (a,b) <- info, b /= 0]
+
+
         -- PREPARTION
         uni = [(name, universe body) | CoreFunc name _ body <- coreFuncs c2]
         arity = Map.fromList [(coreFuncName x, coreFuncArity x) | x <- coreFuncs c2]
@@ -172,10 +180,7 @@ showStats verbose c = unlines $
         lamb = [(name, length $ filter isCoreLam inner) | (name,inner) <- uni]
         lambCount = sum $ map snd lamb
 
-        show1 xs = pad (sum $ map snd xs) ++ verb xs
-
-        verb info = if verbose && not (null res) then "\n    " ++ unwords res else ""
-            where res = [a ++ "=" ++ show b | (a,b) <- info, b /= 0]
+        show1 xs = (sum $ map snd xs, xs)
 
 
         -- SECOND TWO
@@ -187,10 +192,7 @@ showStats verbose c = unlines $
                , Just a <- [Map.lookup fun arity]
                , let d = compare (length args) a, d /= EQ]
 
-        show2 set = pad (length set) ++ show4 fst set
-        show3 set = pad (length . group . sort . map (fst . snd) $ set) ++ show4 snd set
+        show2 set = (length set, show4 fst set)
+        show3 set = (length . group . sort . map (fst . snd) $ set, show4 snd set)
 
-        show4 pick = verb . map (head &&& length) . group . sort . map (pick . snd)
-
-        pad x = replicate (8 - length s) ' ' ++ s
-            where s = show x
+        show4 pick = map (head &&& length) . group . sort . map (pick . snd)
