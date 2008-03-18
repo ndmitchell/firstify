@@ -3,6 +3,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{natbib}
+\usepackage{multirow}
 
 \include{paper}
 
@@ -1081,30 +1082,65 @@ Most analysis operations work on an abstracted view of the program. For example,
 \smallskip\smallskip
 
 \begin{tabular*}{\textwidth}{lrrrrrrlll}
-\hspace{-2mm} \textbf{Name} & \textbf{Src} & \textbf{Core} & \textbf{First} & \textbf{Err} & \textbf{Pre} & \textbf{Sec} & \textbf{Mb} \\
+\textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Size} \\
 \vspace{-1ex} \\
-\hspace{-2mm} Bernoulli*                   & 35 & 1616 &  652 & 5 & 11 & 4.1 & 0.8 \\
-\hspace{-2mm} Digits of E1*  \hspace{-3mm} & 44 &  957 &  377 & 3 &  8 & 0.3 & 0.6 \\
-\hspace{-2mm} Digits of E2   \hspace{-3mm} & 54 & 1179 &  455 & 5 & 19 & 0.5 & 0.8 \\
-\hspace{-2mm} Exp3-8                       & 29 &  220 &  163 & 0 &  0 & 0.1 & 0.1 \\
-\hspace{-2mm} Gen-Regexps*   \hspace{-3mm} & 41 & 1006 &  776 & 1 &  1 & 0.3 & 0.4 \\
-\hspace{-2mm} Integrate                    & 39 & 2466 &  364 & 3 &  3 & 0.3 & 1.9 \\
-\hspace{-2mm} Paraffins*                   & 91 & 2627 & 1153 & 2 &  2 & 0.8 & 1.9 \\
-\hspace{-2mm} Primes                       & 16 &  302 &  241 & 6 & 13 & 0.2 & 0.1 \\
-\hspace{-2mm} Queens                       & 16 &  648 &  283 & 0 &  0 & 0.2 & 0.2 \\
-\hspace{-2mm} Rfib                         &  9 & 1918 &  100 & 0 &  0 & 0.1 & 1.7 \\
-\hspace{-2mm} Tak                          & 12 &  209 &  155 & 0 &  0 & 0.1 & 0.1 \\
-\hspace{-2mm} Wheel Sieve 1* \hspace{-3mm} & 37 & 1221 &  570 & 7 & 10 & 7.5 & 0.9 \\
-\hspace{-2mm} Wheel Sieve 2* \hspace{-3mm} & 45 & 1397 &  636 & 2 &  2 & 0.3 & 0.6 \\
-\hspace{-2mm} X2n1                         & 10 & 2637 &  331 & 2 &  5 & 1.8 & 1.9 \\
-\vspace{-1ex} \\
-\hspace{-2mm} FiniteMap*    \hspace{-3mm} & 670 & 1484 & 1829 & 13 & 17 & 1.6 & 1.0 \\
-\hspace{-2mm} HsColour*     \hspace{-3mm} & 823 & 5379 & 5060 & 4 &  9 & 2.1 & 2.7 \\
+bernouilli      & 4 & 240 & 0 & 190 & 2 & -32 \\
+digits-of-e1    & 4 & 217 & 0 & 153 & 2 & -35 \\
+digits-of-e2    & 5 & 236 & 0 & 198 & 3 & -32 \\
+exp3\_8         & 4 & 232 & 0 & 154 & 2 & -39 \\
+gen\_regexps    & 7 & 116 & 0 & 69 & 0 & -31 \\
+integrate       & 4 & 348 & 0 & 358 & 2 & -38 \\
+paraffins       & 4 & 360 & 0 & 351 & 2 & -53 \\
+primes          & 4 & 217 & 0 & 148 & 2 & -38 \\
+queens          & 4 & 217 & 0 & 146 & 2 & -38 \\
+rfib            & 4 & 338 & 0 & 355 & 2 & -31 \\
+tak             & 4 & 212 & 0 & 145 & 4 & -40 \\
+wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & -35 \\
+wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & -36 \\
+x2n1            & 4 & 345 & 0 & 385 & 2 & -57 \\
+                & \multicolumn{7}{c} ...Plus 35 tests from the spectral suite... \\
+Minimum         & 2 & 60 & 0 & 46 & 0 & -78 \\
+Maximum         & 14 & 437 & 1 & 449 & 100 & 15 \\
+Average         & 4.80 & 237.88 & 0.06 & 202.20 & 3.55 & -32.50 \\
 \hline
 \end{tabular*}
 \end{table*}
 
-All of these factors combine, and a particular torture test is |show (1 :: Double)|. The results are presented in Table \ref{tbl:results}. We have given detailed results for the 14 imaginary benchmarks, and a min/max/average for the spectral suite. The column 
+All of these factors combine, and a particular torture test is |show (1 :: Double)|. The results are presented in Table \ref{tbl:results}. We have given detailed results for the 14 imaginary benchmarks, and a min/max/average for the spectral suite. The column
+
+The only programs which don't firstify are:
+
+Program: integer
+
+\begin{code}
+seqlist [] = return ()
+seqlist (x:xs) = x `seq` seqlist xs
+\end{code}
+
+Because this code is run within the IO monad, the return is a functional value, and is passed to the primitive seq.
+
+Program: constraints, undefined is applied to the lambda. In pretty it is more directly an error call.
+
+Program: pretty
+
+All as a result of calling foldr1, making it return a function, and applying the function.
+
+combine xs = foldr1 f nil xs
+
+And then later calling combine xs
+
+type Pretty = Int             -- The width to print in
+	    -> Bool           -- True => vertical context
+	    -> PrettyRep
+
+ppBesides     :: [Pretty] -> Pretty
+
+
+
+If we wanted this, we would have to treat error a lambda, or use the type information.
+
+
+
 
 
 
