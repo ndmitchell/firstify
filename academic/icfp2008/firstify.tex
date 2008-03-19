@@ -1182,17 +1182,17 @@ The closest work to ours is that of Chin and Darlington \cite{chin:higher_order_
 \item By splitting our the simplification rules, our other stages are comparatively simple to theirs.
 \end{itemize}
 
-The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were much newer when the work was done. Our work can be seen as a successor to theirs, acheiving similar goals but with a greater complexity of input program.
+The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were much newer when the work was done. Our work can be seen as a successor to theirs, acheiving similar goals but with a greater complexity of input program. Our work acheives most of the aims set out in their future work section.
 
 Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example ?. We have tried their examples, and can confirm that all of them are successfully handled by our system.
 
 The specialisation and inlining steps are taken from existing program optimisers, as it the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
 
-\section{Conclusions}
+\section{Conclusions and Future Work}
 
-We have developed a method for removing functional values from a program. Our method has good results, and has found practical use within the Catch tool.
+Higher order functions are very useful to the programmer, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. Our method has already found a practical user within the Catch tool, and we hope it can be of benefit to others.
 
-
+The implementation presented in this paper is designed for clarity, not speed. By simply tracking which functions have changed, a massive performance could be obtained. The use of a numeric termination bound in the homeomorphic embedding is regretable, but highly practically motivated. We need further research to determine if such a numeric bound is necessary, or if other measures could be used, and what the bound should be.
 
 \section*{Appendix A}
 
