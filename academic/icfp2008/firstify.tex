@@ -1052,98 +1052,92 @@ We have shown that arity raising, inlining and specialisation are finite. The re
 
 \section{Results}
 
-We have applied our method to tests drawn from the imaginary and spectral section of the nofib benchmark. We have worked with all 14 tests in the imaginary section, but have restricted our focus to 35 out of the 47 spectral tests. The reason for leaving 12 out is that they do not compile with Yhc, typically due to missing libraries or unimplemented base library functions. The programs that are excluded are not highly higher-order, and we suspect their results would be similar to the remaining ones.
-
-Most analysis operations work on an abstracted view of the program. For example, the underlying IO mechanism of the Yhc standard libraries uses handles and pointers to read files -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of the firstification, we have worked on unmodified Yhc libraries, including all the low-level detail. Some particular places where higher-order functions are used:
-
-\begin{itemize}
-\item The monadic bind operation is higher-order.
-\item The IO monad itself is implemented as a function.
-\item Dictionaries are implemented as tuples of functions.
-\item The Haskell |Show| framework uses continuation passing style extensively.
-\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{list_comps,duncan_deforestation}.
-\end{itemize}
-
-\begin{table*}
-\caption{Table of results}
+\begin{table}
+\caption{Results of defunctionalisation on the nofib suite.}
 \label{tab:results}
 
 \smallskip
 
-\textbf{Name} is the name of the checked program (a starred name indicates that changes were needed before safe pattern-matching could be verified);
-\textbf{Src} is the number of lines in the original source code;
-\textbf{Core} is the total number of lines of Yhc Core, including all functions used from libraries;
-\textbf{First} is the number of lines after firstification, just before analysis;
-\textbf{Err} is the number of calls to |error| (missing pattern cases);
-\textbf{Pre} is the number of functions which have a precondition which is not simply `True';
-\textbf{Sec} is the time taken for transformations and analysis;
-\textbf{Mb} is the maximum residency of the Firstify program at garbage collection time.
+\textbf{Name} is the name of the program;
+\textbf{Bound} is the numeric bound use for the termination (see \S?);
+\textbf{HO Create} the number of lambda expressions and under-applied functions, first in the input program and then in the output program;
+\textbf{HO Use} the number of application expressions and over-applied functions;
+\textbf{Size} the change in the program size.
 
 \smallskip\smallskip
 
-\begin{tabular*}{\textwidth}{lrrrrrrlll}
+\begin{tabular*}{\linewidth}{lrrrrrrlll}
 \textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Size} \\
 \vspace{-1ex} \\
-bernouilli      & 4 & 240 & 0 & 190 & 2 & -32 \\
-digits-of-e1    & 4 & 217 & 0 & 153 & 2 & -35 \\
-digits-of-e2    & 5 & 236 & 0 & 198 & 3 & -32 \\
-exp3\_8         & 4 & 232 & 0 & 154 & 2 & -39 \\
-gen\_regexps    & 7 & 116 & 0 & 69 & 0 & -31 \\
-integrate       & 4 & 348 & 0 & 358 & 2 & -38 \\
-paraffins       & 4 & 360 & 0 & 351 & 2 & -53 \\
-primes          & 4 & 217 & 0 & 148 & 2 & -38 \\
-queens          & 4 & 217 & 0 & 146 & 2 & -38 \\
-rfib            & 4 & 338 & 0 & 355 & 2 & -31 \\
-tak             & 4 & 212 & 0 & 145 & 4 & -40 \\
-wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & -35 \\
-wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & -36 \\
-x2n1            & 4 & 345 & 0 & 385 & 2 & -57 \\
-                & \multicolumn{7}{c} ...Plus 35 tests from the spectral suite... \\
-Minimum         & 2 & 60 & 0 & 46 & 0 & -78 \\
-Maximum         & 14 & 437 & 1 & 449 & 100 & 15 \\
-Average         & 4.80 & 237.88 & 0.06 & 202.20 & 3.55 & -32.50 \\
+bernouilli      & 4 & 240 & 0 & 190 & 2 & -32\% \\
+digits-of-e1    & 4 & 217 & 0 & 153 & 2 & -35\% \\
+digits-of-e2    & 5 & 236 & 0 & 198 & 3 & -32\% \\
+exp3\_8         & 4 & 232 & 0 & 154 & 2 & -39\% \\
+gen\_regexps    & 7 & 116 & 0 &  69 & 0 & -31\% \\
+integrate       & 4 & 348 & 0 & 358 & 2 & -38\% \\
+paraffins       & 4 & 360 & 0 & 351 & 2 & -53\% \\
+primes          & 4 & 217 & 0 & 148 & 2 & -38\% \\
+queens          & 4 & 217 & 0 & 146 & 2 & -38\% \\
+rfib            & 4 & 338 & 0 & 355 & 2 & -31\% \\
+tak             & 4 & 212 & 0 & 145 & 4 & -40\% \\
+wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & -35\% \\
+wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & -36\% \\
+x2n1            & 4 & 345 & 0 & 385 & 2 & -57\% \\
+\multicolumn{8}{l} \ldots{}plus 35 tests from the spectral suite\ldots{} \\
+Minimum         & 2 & 60 & 0 & 46 & 0 & -78\% \\
+Maximum         & 14 & 437 & 1 & 449 & 100 & 15\% \\
+Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & -33\% \\
 \hline
 \end{tabular*}
-\end{table*}
+\end{table}
 
-All of these factors combine, and a particular torture test is |show (1 :: Double)|. The results are presented in Table \ref{tbl:results}. We have given detailed results for the 14 imaginary benchmarks, and a min/max/average for the spectral suite. The column
+We have tested out method with programs drawn from the nofib benchmark \cite{nofib}, and the results are given in Table \ref{tab:results}. We have tested with all 14 tests from the imaginary section (each shown in the table), and 35 out of the 47 tests in the spectral section. The remaining 12 tests in the spectral section do not compile using the Yhc compiler, mainly due to missing or incomplete libraries.
 
-The only programs which don't firstify are:
+Most analysis operations work on an abstracted view of the program. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of the firstification, we have worked on unmodified Yhc libraries, including all the low-level detail. Higher-order functions occur in many places, including:
 
-Program: integer
+\begin{itemize}
+\item Typeclass dictionaries are implemented as tuples of functions.
+\item The monadic bind operation is higher-order.
+\item The IO data type is implemented as a function.
+\item The Haskell |Show| type class uses continuation passing style extensively.
+\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{list_comps,duncan_deforestation}.
+\end{itemize}
+
+One torture test we have used during testing is |show (1 :: Double)|. The underlying implementation of |show| on |Double| makes use of arrays, which are implemented within the |IO| monad. Out of the tests, only 3 programs have residual functional values within them.
+
+The integer program passes functional values to the primitive |seq|, similar to Example ?, using the following function:
 
 \begin{code}
 seqlist [] = return ()
 seqlist (x:xs) = x `seq` seqlist xs
 \end{code}
 
-Because this code is run within the IO monad, the return is a functional value, and is passed to the primitive seq.
+This function is invoked with the IO monad, so the |return ()| expression is a functional value. It is impossible to remove this functional value without having access to the implementation of the |seq| primitive.
 
-Program: constraints, undefined is applied to the lambda. In pretty it is more directly an error call.
+The pretty and constraints programs both apply a functional value to an expression that evaluates to |undefined|, similar to Example ?. The case in pretty comes from the fragment:
 
-Program: pretty
-
-All as a result of calling foldr1, making it return a function, and applying the function.
-
-combine xs = foldr1 f nil xs
-
-And then later calling combine xs
-
-type Pretty = Int             -- The width to print in
-	    -> Bool           -- True => vertical context
-	    -> PrettyRep
+\begin{code}
+type Pretty = Int -> Bool -> PrettyRep
 
 ppBesides     :: [Pretty] -> Pretty
+ppBesides = foldr1 f nil
+\end{code}
 
+Here |ppBesides| may evaluate to |undefined| if the input list to |foldr1| is |[]|. Here the |undefined| value will be of type |Pretty|, and will be given further arguments, which can be functions. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
 
+It would be possible to remove the lambda expression by treating the |undefined| value as a functional value, perhaps using the type system to detect which values have a function type.
 
-If we wanted this, we would have to treat error a lambda, or use the type information.
+The termination bound used on the programs varies from 2 to 11 within the sample programs. If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no realation to the size of a program and the termination bound.
 
+On average the size of the resultant program is smaller by 33\%. We measured program size by taking the number of nodes in the abstract syntax tree, and the number of functions. We took the average of the two measures, which were typically very close to each other. Before counting the size we remove all functions which simply call on to other functions passing the same arguments, for example:
 
+\begin{code}
+f x y = g x y
+\end{code}
 
+Given this, we would replace all invokations of |f| with |g|. The reason for the decrease in program size is due to dictionaries holding references to unnecessary code.
 
-
-
+The results show that the termination criteria we have chosen are sufficiently relaxed to enable firstification in most programs.
 
 \section{Reynolds style defunctionalization}
 
