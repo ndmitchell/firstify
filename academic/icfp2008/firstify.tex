@@ -64,7 +64,7 @@
 \maketitle
 
 \begin{abstract}
-We describe an automated transformation which takes a higher-order program, and a produces an equivalent program with most functional values removed. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method has a number of advantages over Reynold's style defunctionalisation -- it is type safe within the Hindley-Milner framework, and the results are more amenable to subsequent analysis operations. While our method cannot always succeed in removing all functional values, in practice it usually manages to.
+We describe an automated transformation which takes a higher-order program, and a produces an equivalent program with most functional values removed. Our method has a number of advantages over Reynold's style defunctionalisation -- it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. While our method cannot always succeed in removing all functional values, in practice it usually manages to. We have evaluated our method on programs from the nofib benchmark, where only 3 out of 49 remain higher-order.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -77,7 +77,7 @@ Haskell, first-order reduction, firstification, defunctionalisation, functional 
 
 \section{Introduction}
 
-Higher-order functions are well used and much loved within functional programming languages such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into a the application of a function taking a tuple containing many functional values -- as part of the dictionary transformation for the implementation of type classes \cite{wadler:typeclasses}. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{catch} and termination checking \cite{termination_checking}.
+Higher-order functions are well used and much loved within functional programming languages such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into a the application of a function taking a tuple containing many functional values -- as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{me:catch_icfp} and termination checking \cite{sereni:higher_order_termination}.
 
 \begin{example}
 \label{ex:incList}
@@ -102,11 +102,13 @@ incList (x:xs)  = x+1 : incList xs
 While the second variant of |incList| is much longer, it may also be more amenable to certain types of analysis -- and indeed may also perform faster at runtime. The transformation pass presented in this paper performs the above transformation automatically.
 \end{example}
 
-Our first-order reduction method processes the program as a whole to remove the functional values, without changing the semantics of the program. This idea is not new, indeed as far back as 19** Reynold's gave a solution, known as Reynold's style defunctionalisation \cite{reynolds:defunctionalisation}. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
+Our first-order reduction method processes the program as a whole to remove the functional values, without changing the semantics of the program. This idea is not new, indeed as far back as 1972 Reynold's gave a solution, known as Reynold's style defunctionalisation \cite{reynolds:defunc}. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
 
-Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler (Yhc). We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/}} -- and hope others from the termination checking community may be able to make use of it.
+Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler (Yhc). We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/cgi-bin/hackage-scripts/package/firstify}} -- and hope others from the termination checking community may be able to make use of it.
 
 \subsection{Contribution}
+
+\todo{Strengthen}
 
 Our paper makes a number of contributions:
 
@@ -119,9 +121,10 @@ Our paper makes a number of contributions:
 
 \subsection{Roadmap}
 
-This paper starts with a definition of our Core language \S?, including what we consider to be a higher-order function. Next we present out method in \S?, motivated by a series of examples. Next we classify where out method may fail to remove higher order functions. We then prove that our method is correct in \S?, and terminating in \S?. Finally we give results \S?, review related work \S? and conclude \S?.
+This paper starts with a definition of our Core language \S\ref{sec:core}, including what we consider to be a higher-order function. Next we present an overview of our method \S\ref{sec:overview}, followed by a more detailed account \S\ref{sec:detailed}, along with a number of examples in \S\ref{sec:examples}. We classify where functional values may remain in a resultant program \S\ref{sec:completeness} and show how to modify our method to make it terminating \S\ref{sec:termination}. Finally we give results \S\ref{sec:results}, review related work \S\ref{sec:related} and conclude \S\ref{sec:conclusion}.
 
 \section{Our Core Language}
+\label{sec:core}
 
 \begin{figure}
 \begin{code}
@@ -148,35 +151,35 @@ We let |v| range over variables, |x| over expressions, |f| over function names a
 
 Our Core language is presented in Figure \ref{fig:core} -- and has a number of differences from a standard Core language. A function in our Core language consists of a name, a list of arguments, and a body expression. The arity of a function is the number of arguments associated with it.
 
-The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor -- any constructors not given enough arguments can be wrapped within a lambda expression. The function expression consists of a function and a list of expressions -- a number which may be more, equal to, or less than the arity of the function.
+The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor -- any constructors not given enough arguments can be wrapped within a lambda expression. The function expression consists of a function and a list of argument expressions -- a number which may be more, equal to, or less than the arity of the function. If a function is given too few arguments, we refer to it as \textit{partially-applied}, the right number is \textit{fully-applied} and too many is \textit{over-applied}.
 
-A program can be said to be higher-order if at runtime the program generates and manipulates functional values. We define a program to be first-order if we can guarantee that at runtime it will create no functional values. Functional values can only be created in two ways: (1) a lambda expression; (2) an under-saturated function application. We define a first-order program to be one containing neither of these constructs.
+\paragraph{Definition: First-Order} A program can be said to be higher-order if at runtime the program generates and manipulates functional values. We define a program to be first-order if we can guarantee that at runtime it will create no functional values. Functional values can only be created in two ways: (1) a lambda expression; (2) an under-saturated function application. We define a first-order program to be one containing neither of these constructs.
 
 In Example \ref{ex:incList}, our program is higher-order because of the under-saturation of both |map| and |(+)|. In the reduced version, the program is first-order.
 
-We do not permit primitives in our language, but explain how to extend our method to them in \S?. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S?.
+We do not permit primitives in our language, but explain how to extend our method to them in \S?. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S\ref{sec:primitives}.
 
-We use |arity f|, |body f| and |args f| to denote the arguments, body and arity of f.
+We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of f. We use the function |rhs| to extract the expression on the right of a case branch.
 
 
 \section{Our First-Order Reduction Method}
+\label{sec:overview}
 
-Our method works by combining four separate and well-known transformations:
+Our method works by combining three separate and well-known transformations, along with general simplification rules including many from standard Haskell compilers \cite{spj:transforming}.
 
 \begin{description}
-\item[Simplification:] We use various standard functional programming simplification rules to perform local transformations within an expression. \cite{Compilation by Transformation in the Glasgow Haskell Compiler}
-\item[Arity Raising:] A function is arity raised \cite{arity_raising} if by local transformations the arity of a function can be changed, without changing its semantics.
+\item[Arity Raising:] A function is arity raised if by local transformations the arity of a function can be changed, without changing its semantics.
 \item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inline}, and has been studied at length.
 \item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{hudak:removing_type_classes} and more recently to specialisation functions to a given constructor \cite{spj:specconstr}.
 \end{description}
 
-Each transformation has the possibility of removing some functional values, but the key contribution of this paper is how they can be used together, to remove functional values. One important aspect is that each of these transformations is Hindley-Milner type preserving, and correctness preserving. None of these operations introduce any additional data structures. This is in contrast to Reynold's style defunctionalisation, which is not HM type preserving.
+Each transformation has the possibility of removing some functional values, but \textit{the key contribution of this paper is how they can be used together}, to remove functional values. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be performed in a typed Core language, although we have not done so.
 
-We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss in detail how each step can be specified, how they can be combined, and what restrictions are necessary.
+We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss in detail how each step can be specified in \S\ref{sec:detailed}, including how they can be combined, and what restrictions are necessary for termination in \S\ref{sec:termination}.
 
 \subsection{Simplification}
 
-The simplification step serves to group all the short and simple transformations that most optimising compilers apply, typically as part of a simplification stage \cite{ghc_simplifier}. Some of these steps have the ability to remove functional values, while others simply ensure a normal form for future transformations.
+The simplification step serves to group all the short and simple transformations that most optimising compilers apply, typically as part of a simplification stage. Some of these steps have the ability to remove functional values, while others simply ensure a normal form for future transformations.
 
 \begin{example}
 \begin{code}
@@ -194,22 +197,24 @@ Other rules within the program do not eliminate lambda expressions, but manipula
 
 \begin{example}
 \begin{code}
-even = let one = 1 in \x -> not (odd x)
+even =  let one = 1
+        in \x -> not (odd x)
 \end{code}
 
 Here the let expression is surrounding the lambda expression. We can lift the lambda expression out of the let expression.
 
 \begin{code}
-even = \x -> let one = 1 in not (odd x)
+even = \x ->  let one = 1
+              in not (odd x)
 \end{code}
 
-In general this transformation may cause duplicate computation to be performed, an issue we return to in \S?.
+In general this transformation may cause duplicate computation to be performed, an issue we return to in \S\ref{sec:sharing}.
 \end{example}
 
 
 \subsection{Arity Raising}
 
-The arity raising transformation is an attempt to increase the arity of a function.
+The arity raising transformation is an attempt to increase the arity of a function, also known as eta expansion. It relies heavily on the simplification stage.
 
 \begin{example}
 \begin{code}
@@ -257,10 +262,6 @@ Specialisation works by replacing a function with a more specialised variant wit
 
 \begin{example}
 \begin{code}
-map f x = case  x of
-                []    -> []
-                y:ys  -> f y : map f ys
-
 notList xs = map not xs
 \end{code}
 
@@ -302,6 +303,7 @@ By composing our transformation out of three existing transformations, none of w
 \paragraph{Preserve the space/sharing behaviour of the program.} In the expression |let y = f x in y + y|, according to the rules of lazy evaluation, |f x| will be evaluated at most once. We could inline the let binding to give |f x + f x|, but this expression evaluates |f x| twice. Where possible, we will avoid changing the sharing of the program. Our goals are primarily for analysis of the resultant code, not to compile and execute the result. Because we are not interested in performance, we permit the loss of sharing in computations, if to do so will remove functional values.
 
 \section{Method in Detail}
+\label{sec:detailed}
 
 Our method proceeds in four steps, simplification (|simplify|), arity raising (|arity|), inlining (|inline|) and specialisation (|specialise|). These steps are combined using a fixed point operator.
 
@@ -500,6 +502,7 @@ The lambda insertion phase can be seen as first transforming the function |f| us
 
 
 \subsubsection{Lambda Movement}
+\label{sec:sharing}
 
 The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (bind-box) rule will be discussed as part of the inlining stage, see \S?. The (let-lam) rule is the one responsible for the largest loss of sharing, promoting a lambda expression outside a let, although (case-lam) can be used in a similar manner to reduce the sharing.
 
@@ -691,11 +694,13 @@ map_id v_1 =  let  xs = v_1
 
 We have now eliminated all the functional values from within this operation.
 
-\subsection{Extending to Primitives}
+\subsubsection{Extending to Primitives}
+\label{sec:primitives}
 
 The specialisation is the only section that requires extending when working within a language containing primitives. The only restriction is that if a function to be specialised is actually a primitive, no template should be generated. The reason for this is because the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
 
 \section{Examples}
+\label{sec:examples}
 
 To show the boundaries of our method, and the reason certain decisions have been made, we now show several examples.
 
@@ -807,6 +812,7 @@ Consider the above code. The function |gen| returns a boxed lambda. However, the
 
 
 \section{Classification of Completeness}
+\label{sec:completeness}
 
 Our method would be complete if it removed all lambda expressions from a program. Completeness is not obtainable given the termination restriction (see \S?). We have two causes of incompleteness: those that come from the fundamental algorithm, and those that are added by any termination criteria in \S?. Here we explore causes arising from our algorithm. We wish to classify where a lambda expression may reside in a program after the application of our firstification method.
 
@@ -927,7 +933,7 @@ In the first case there must be no corresponding |Just| value containing a funct
 
 
 \section{Proof of Termination}
-\label{sec:firstify_terminate}
+\label{sec:termination}
 
 Our algorithm, as it stands, is not terminating. In order to ensure termination, it is necessary to bound both the inlining and specialisation stages. In this section we develop the termination criteria, by first looking at how non-termination may arise.
 
@@ -1013,7 +1019,7 @@ One of the conditions for termination of homeomorphic embedding is that there is
 
 Using homeomorphic embedding on the previous example, we would generate the specialised variant of |f (Value head)|. Upon attempting to generate the specialised variant |f (Wrap (Value head))| we would abort, with an embedding.
 
-While homeomorphic embedding is sufficient to obtain defunctionalisation in many examples, there do exist examples where it terminates prematurely.
+While homeomorphic embedding is sufficient to obtain defunctionalization in many examples, there do exist examples where it terminates prematurely.
 
 \begin{example}
 \begin{code}
@@ -1051,9 +1057,10 @@ We call a function |f| finite if it only applies a finite number of times, given
 We have shown that arity raising, inlining and specialisation are finite. The remaining step, simplification, is terminating. Therefore our entire program is terminating.
 
 \section{Results}
+\label{sec:results}
 
 \begin{table}
-\caption{Results of defunctionalisation on the nofib suite.}
+\caption{Results of defunctionalization on the nofib suite.}
 \label{tab:results}
 
 \smallskip
@@ -1140,6 +1147,7 @@ Given this, we would replace all invokations of |f| with |g|. The reason for the
 The results show that the termination criteria we have chosen are sufficiently relaxed to enable firstification in most programs.
 
 \section{Related Work}
+\label{sec:related}
 
 Reynolds style defunctionalization \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
 
@@ -1168,7 +1176,7 @@ map f x = case  x of
 
 Reynold's method works on all programs, Defunctionalized code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
 
-We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the |Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
+We are unaware of any simple method for extending Reynold's style defunctionalization to primitives, without changes the primitives to be aware of the |Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
 
 Reynold's method has been used as a tool in program calculation \cite{danvy:defunctionalization_at_work,hutton:calculating_an_exceptional_machine}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
 
@@ -1189,6 +1197,7 @@ Some of their observations and extensions apply equally to our work, for example
 The specialisation and inlining steps are taken from existing program optimisers, as it the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
 
 \section{Conclusions and Future Work}
+\label{sec:conclusion}
 
 Higher order functions are very useful to the programmer, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. Our method has already found a practical user within the Catch tool, and we hope it can be of benefit to others.
 
