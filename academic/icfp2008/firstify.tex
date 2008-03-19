@@ -64,7 +64,7 @@
 \maketitle
 
 \begin{abstract}
-We describe an automated transformation which takes a higher-order program, and a produces an equivalent program with most functional values removed. Our method has a number of advantages over Reynold's style defunctionalisation -- it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. While our method cannot always succeed in removing all functional values, in practice it usually manages to. We have evaluated our method on programs from the nofib benchmark, where only 3 out of 49 remain higher-order.
+We describe an automated transformation which takes a higher-order program, and a produces an equivalent program with fewer functional values. Our method has a number of advantages over Reynold's style defunctionalization -- it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. While our method cannot always succeed in removing all functional values, in practice it is remarkably successful. We have evaluated our method on programs from the nofib benchmark, where only 3 out of 49 remain higher-order.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -73,11 +73,11 @@ We describe an automated transformation which takes a higher-order program, and 
 languages, transformation
 
 \keywords
-Haskell, first-order reduction, firstification, defunctionalisation, functional programming
+Haskell, first-order reduction, firstification, defunctionalization, functional programming
 
 \section{Introduction}
 
-Higher-order functions are well used and much loved within functional programming languages such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into a the application of a function taking a tuple containing many functional values -- as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{me:catch_icfp} and termination checking \cite{sereni:higher_order_termination}.
+Higher-order functions are well used and much loved within functional programming languages, such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into the application of a function taking a tuple containing many functional values. This operation occurs as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{me:catch_icfp} and termination checking \cite{sereni:higher_order_termination}.
 
 \begin{example}
 \label{ex:incList}
@@ -91,7 +91,7 @@ map f x = case  x of
                 y:ys  -> f y : map f ys
 \end{code}
 
-Consider the above definition of |incList|, containing many higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has lead to short code, but we could equally have written:
+Consider the above definition of |incList|, which contains many higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has lead to short code, but we could equally have written:
 
 \begin{code}
 incList :: Int -> Int
@@ -102,26 +102,23 @@ incList (x:xs)  = x+1 : incList xs
 While the second variant of |incList| is much longer, it may also be more amenable to certain types of analysis -- and indeed may also perform faster at runtime. The transformation pass presented in this paper performs the above transformation automatically.
 \end{example}
 
-Our first-order reduction method processes the program as a whole to remove the functional values, without changing the semantics of the program. This idea is not new, indeed as far back as 1972 Reynold's gave a solution, known as Reynold's style defunctionalisation \cite{reynolds:defunc}. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
+Our first-order reduction method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new, as far back as 1972 Reynold's gave a solution, known as Reynold's style defunctionalization \cite{reynolds:defunc}. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
 
-Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler (Yhc). We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/cgi-bin/hackage-scripts/package/firstify}} -- and hope others from the termination checking community may be able to make use of it.
+Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler \cite{me:yhc_core}. We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our defunctionalization method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/cgi-bin/hackage-scripts/package/firstify}} -- and hope others from the termination checking community may be able to make use of it.
 
-\subsection{Contribution}
-
-\todo{Strengthen}
+\subsection{Contributions}
 
 Our paper makes a number of contributions:
 
-\begin{enumerate}
-\item We define three transformation steps to remove functional values.
-\item We show how to apply these transformation steps, in particular to maximise the removal of functional values.
-\item We define termination criteria to ensure termination of our method.
-\item We present results from the nofib suite, including discussions of the limits of our transformation mechanism.
-\end{enumerate}
+\begin{itemize}
+\item We define a method to remove most functional values from a program. Unlike previous work our method does not introduce new types, and can deal well with complexities such as type classes, continuations and monads.
+\item Our method makes use of standard transformation steps, but the key is in their combination. In particular, we describe what restrictions are required, to ensure better defunctionalization, and to guarantee termination.
+\item We have implemented our method, and present results for much of the nofib benchmark suite. These results enable us to measure the effectiveness of our method.
+\end{itemize}
 
 \subsection{Roadmap}
 
-This paper starts with a definition of our Core language \S\ref{sec:core}, including what we consider to be a higher-order function. Next we present an overview of our method \S\ref{sec:overview}, followed by a more detailed account \S\ref{sec:detailed}, along with a number of examples in \S\ref{sec:examples}. We classify where functional values may remain in a resultant program \S\ref{sec:completeness} and show how to modify our method to make it terminating \S\ref{sec:termination}. Finally we give results \S\ref{sec:results}, review related work \S\ref{sec:related} and conclude \S\ref{sec:conclusion}.
+This paper begins with a definition of our Core language \S\ref{sec:core}, including what we consider to be a first-order program. Next we present an overview of our method \S\ref{sec:overview}, followed by a more detailed account \S\ref{sec:detailed}, along with a number of examples in \S\ref{sec:examples}. We classify where functional values may remain in a resultant program \S\ref{sec:completeness} and show how to modify our method to guarantee termination \S\ref{sec:termination}. Finally we give results \S\ref{sec:results}, review related work \S\ref{sec:related} and conclude \S\ref{sec:conclusion}.
 
 \section{Our Core Language}
 \label{sec:core}
@@ -148,35 +145,35 @@ We let |v| range over variables, |x| over expressions, |f| over function names a
 
 Our Core language is presented in Figure \ref{fig:core} -- and has a number of differences from a standard Core language. A function in our Core language consists of a name, a list of arguments, and a body expression. The arity of a function is the number of arguments associated with it.
 
-The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor -- any constructors not given enough arguments can be wrapped within a lambda expression. The function expression consists of a function and a list of argument expressions -- a number which may be more, equal to, or less than the arity of the function. If a function is given too few arguments, we refer to it as \textit{partially-applied}, the right number is \textit{fully-applied} and too many is \textit{over-applied}.
+The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor -- any constructors not given enough arguments can be wrapped within a lambda expression. The function expression consists of a function and a list of argument expressions -- a number which may be less, equal to, or more than the arity of the function. If a function is given too few arguments, we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied} and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of f. We use the function |rhs| to extract the expression on the right of a case alternative.
 
-\paragraph{Definition: First-Order} A program can be said to be higher-order if at runtime the program generates and manipulates functional values. We define a program to be first-order if we can guarantee that at runtime it will create no functional values. Functional values can only be created in two ways: (1) a lambda expression; (2) an under-saturated function application. We define a first-order program to be one containing neither of these constructs.
+A program can be said to be higher-order if at runtime the program generates and manipulates functional values. Functional values can only be created in two ways: (1) a lambda expression; (2) a partially-applied function application. We make the following definition:
 
-In Example \ref{ex:incList}, our program is higher-order because of the under-saturation of both |map| and |(+)|. In the reduced version, the program is first-order.
+\paragraph{Definition: First-Order} A program which contains no lambda expressions and no partially-applied functions is first-order.
 
-We do not permit primitives in our language, but explain how to extend our method to them in \S\ref{sec:primitives}. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S\ref{sec:primitives}.
+In Example \ref{ex:incList}, our program is higher-order because of the under-saturation of both |map| and |(+)|. In the defunctionalized version, the program is first-order.
 
-We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of f. We use the function |rhs| to extract the expression on the right of a case branch.
+We do not permit primitives in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in Example \ref{ex:root_function_functional}.
 
 
 \section{Our First-Order Reduction Method}
 \label{sec:overview}
 
-Our method works by combining three separate and well-known transformations, along with general simplification rules including many from standard Haskell compilers \cite{spj:transformation}.
+Our method works by combining three separate and well-known transformations. Additionally we use general simplification rules, most of which may be found in any optimising compiler \cite{spj:transformation}.
 
 \begin{description}
-\item[Arity Raising:] A function is arity raised if by local transformations the arity of a function can be changed, without changing its semantics.
-\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied at length.
-\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialisation functions to a given constructor \cite{spj:specconstr}.
+\item[Arity Raising:] A function is arity raised if the body of the function is a lambda expression. In this situation, the variables within the lambda expression can be added as arguments to the function.
+\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied in depth.
+\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialise functions to a given constructor \cite{spj:specconstr}.
 \end{description}
 
-Each transformation has the possibility of removing some functional values, but \textit{the key contribution of this paper is how they can be used together}, to remove functional values. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be performed in a typed Core language, although we have not done so.
+Each transformation has the possibility of removing some functional values, but the key contribution of this paper is \textit{how they can be used together}. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be implemented upon a typed Core language, although we have not done so.
 
-We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss in detail how each step can be specified in \S\ref{sec:detailed}, including how they can be combined, and what restrictions are necessary for termination in \S\ref{sec:termination}.
+We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss each step in detail in \S\ref{sec:detailed}, including how they can be combined. We leave the issue of termination until \S\ref{sec:termination}.
 
 \subsection{Simplification}
 
-The simplification step serves to group all the short and simple transformations that most optimising compilers apply, typically as part of a simplification stage. Some of these steps have the ability to remove functional values, while others simply ensure a normal form for future transformations.
+The simplification step serves to group all the short and simple transformations that most optimising compilers apply. Some of these steps have the ability to remove functional values, while others simply ensure a normal form for future transformations.
 
 \begin{example}
 \begin{code}
@@ -211,14 +208,14 @@ In general this transformation may cause duplicate computation to be performed, 
 
 \subsection{Arity Raising}
 
-The arity raising transformation is an attempt to increase the arity of a function, also known as eta expansion. It relies heavily on the simplification stage.
+The arity raising transformation is an attempt to increase the arity of a function. It relies heavily on the simplification stage.
 
 \begin{example}
 \begin{code}
 even = \x -> not (odd x)
 \end{code}
 
-Here the arity raising transformation changes the body of the function from being a lambda, and lifts the lambda arguments into the explicit arity of the function.
+Here the arity raising transformation changes the body of the function from being a lambda, and lifts the argument to the lambda into an argument of the function -- increasing the arity.
 
 \begin{code}
 even x = not (odd x)
@@ -228,7 +225,7 @@ even x = not (odd x)
 
 \subsection{Inlining}
 
-If a function returns a data constructor containing functional values, one way to remove these functional values is to use inlining.
+We use inlining to remove functions which return data constructors containing functional values.
 
 \begin{example}
 \begin{code}
@@ -238,24 +235,23 @@ f = case  eqInt of
 eqInt = (primEqInt, primNeqInt)
 \end{code}
 
-In the above example the |eqInt| function evaluates to a tuple, where both |primEqInt| and |primNeqInt| are functional values. We can start to remove these elements by inlining the function |eqInt|:
+In the above example the |eqInt| function evaluates to a tuple, where both |primEqInt| and |primNeqInt| are functional values. We can start to remove these functional values by inlining the function |eqInt|:
 
 \begin{code}
 f = case  (primEqInt, primNeqInt) of
           (a,b) -> a 1 2
 \end{code}
 
-Next if we use the rule that the case scrutinee is a known constructor, we can reduce the program to a first-order variant. This rule is applied by the simplification stage.
+We can now simplify the program into a first-order variant, using a rule dealing with a case scrutinising a known constructor. This rule is applied by the simplification stage.
 
 \begin{code}
-f = case  (primEqInt, primNeqInt) of
-          (a,b) -> a 1 2
+f = primEqInt 1 2
 \end{code}
 \end{example}
 
 \subsection{Specialisation}
 
-Specialisation works by replacing a function with a more specialised variant with some of its arguments passed at compile time.
+Specialisation works by replacing a function application with a specialised variant, where some of the arguments are passed at compile time.
 
 \begin{example}
 \begin{code}
@@ -278,19 +274,17 @@ The recursive call in |map| is replaced by a recursive call to the specialised v
 \subsection{Goals}
 \label{sec:goals}
 
-Our goal is to combine the transformations we have  presented to remove as many functional values as possible. For example, the initial |incList| example required simplification, arity raising and specialisation. We have defined a number of goals, in order of priority. Some of the earlier goals mean that later goals are unacheivable -- and we will merely do the best we can.
+Our goal is to combine the transformations we have  presented to remove as many functional values as possible. For example, the initial |incList| example requires simplification, arity raising and specialisation. We have defined a number of goals, in order of priority. Some of the earlier goals mean that later goals are unachievable -- in these cases we will merely do the best we can.
 
-\paragraph{Correct and terminating.} Like all transformation methods, both correctness and termination are important to make the transformation useful. By making use of three established transformations, correctness is relatively easy to show. The issue of termination is much harder -- both inlining and specialisation can be applied in ways that will diverge. To ensure termination we have to restrict where these two methods can be applied, using termination criteria. We develop a set of termination criteria, along with a proof that they are sufficient, in \S\ref{sec:termination}.
+\paragraph{Correct and terminating.} Like all transformation methods, both correctness and termination are essential to make the transformation useful. By making use of three established transformations, correctness is relatively easy to show. The issue of termination is much harder -- both inlining and specialisation can be applied in ways that will diverge. In \S\ref{sec:termination} we develop a set of criteria to ensure termination.
 
-\paragraph{Correspondence to the original program.} Since our transformation designed to be performed before analysis, it is important that the results of the analysis can be presented in terms of the original program. We provide a method for transforming expressions in the resultant program into equivalent expressions in the original program.
+\paragraph{Correspondence to the original program.} Since our transformation is designed to be performed before analysis, it is important that the results of the analysis can be presented in terms of the original program. We provide a method for transforming expressions in the resultant program into equivalent expressions in the original program.
 
-\paragraph{Introduce no data types.} Reynold's method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type. A natural desire would be to eliminate the higher-order aspects of a program, \textit{without} introducing any new data structures. Unfortunately, such a transformation is not possible.
+\paragraph{Introduce no data types.} Reynold's method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type into the program. A natural desire would be to eliminate the higher-order aspects of a program, \textit{without} introducing any new data types. By composing our transformation out of existing transformations, none of which introduce data types, we can easily ensure that our resultant transformation does not introduce data types. Unfortunately, such a transformation is not possible.
 
-Given a program, we can remove all data structures by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data, we would end up with a program without data or closures, which is therefore incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
+Given a program, we can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
 
-It is therefore clear that we will not be able to remove all functional values, and meet this goal. We choose therefore to not be complete. If a totally first-order program is required, Reynold's method can be always be applied to the result of our transformation.
-
-By composing our transformation out of three existing transformations, none of which introduce data structures, we can easily ensure that our resultant transformation does not.
+We cannot both remove all functional values and meet this goal. We choose to not introduce any data types, and accept that some functional values may remain in the resultant programs. If a totally first-order program is required, Reynold's method can be always be applied after our transformation.
 
 \paragraph{Remove all functional values.} We have already indicated that the removal of all functional values is an impossible goal within our previous constraints. However, we will attempt to remove as many functional values as possible. In \S\ref{sec:completeness} we classify where functional values may appear in the resultant programs.
 
@@ -306,7 +300,7 @@ By composing our transformation out of three existing transformations, none of w
 
 Our method proceeds in four steps, simplification (|simplify|), arity raising (|arity|), inlining (|inline|) and specialisation (|specialise|). These steps are combined using a fixed point operator.
 
-For the implementation, we have implemented our steps within a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. To simplify the presentation, we have ignored these issues -- while these are tedious engineering issues, they do not effect the algorithm.
+For the implementation, we have implemented our steps within a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. To simplify the presentation, we have ignored these issues -- while these are tedious engineering concerns, they do not effect the underlying algorithm.
 
 Our method is written as:
 
@@ -327,7 +321,7 @@ fix f x = if x == x' then x else fix f x'
     where x' = f x
 \end{code}
 
-The |(+||+)| operator applies the first argument until it reaches a fixed point, then applies the second argument. If the second argument changes the value, the first argument is tried again until a fixed point is achieved. This formulation has several important properties:
+The expression |f +||+ g| applies the |f| to an input until it reaches a fixed point, then applies |g|. If the |g| changes the value, then |f| is tried again until a fixed point is achieved. This formulation has several important properties:
 
 \begin{description}
 \item[Idempotent in each function] After the operation has completed, applying either |f| or |g| will not change the value.
@@ -347,7 +341,7 @@ forall f g x `o` let r = (+|+) f g x in r == (+|+) f g r
 \item[Function ordering] The function |f| will have reached a fixed point before the function |g| is applied. If a postcondition of |f| implies a precondition of |g|, then we can guarantee |g|'s precondition will always be met.
 \end{description}
 
-The final property allows us to overlap the application sites between the two arguments, but guarantee the first will always be chosen. The other two properties ensure that when the operation finishes there will be no further sites where application could occur.
+These properties allow us to combine the individual steps with less regard to their interaction. The function ordering allows us to overlap the application sites of two stages, but prefer one stage over another. The first two properties ensure that after the method terminates no further transformation will be possible.
 
 The operator is left associative, meaning that the code can be rewritten with explicit bracketing as:
 
@@ -461,11 +455,11 @@ let v = x in \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
-The simplification stage has the goal of moving lambdas upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as \cite{spj:transformation}. We also make use of additional rules which deal with lambda expressions, given in Figure \ref{fig:lambda_simplify}.
+The simplification stage has the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied at any subexpression, as long as any rule matches.
 
 \subsubsection{Lambda Introduction}
 
-The (eta) rule inserts lambdas where possible, using $\eta$-expansion. The original code from the Yhc compiler has been lambda lifted \cite{lambda_lift}, so contains no explicit lambda expressions. This rule removes all occurrences of partial application, replacing them with explicit lambda expressions. The second stage moves these lambda expressions around, attempting to lift them to the top level.
+The (eta) rule inserts lambdas where possible, using $\eta$-expansion. The input program from the Yhc compiler has been lambda lifted \cite{lambda_lift}, replacing lambda expressions with partial application. This rule removes all occurrences of partial-application, replacing them with explicit lambda expressions. The second stage moves these lambda expressions around, attempting to lift them to the top level.
 
 \begin{example}
 \begin{code}
@@ -487,25 +481,10 @@ even x = (.) (\y -> not y) (z -> odd z) x
 
 For each partially applied function, a lambda expression is inserted to ensure that the function is now given at least as many arguments as its associated arity. Given a function |f| of arity $n$, if an application of |f| has fewer than $n$ arguments, an application and a lambda is inserted with $n$ arguments. This step trades one form of functional value for another form, but has the advantage of making functional values more explicit, and permitting arity raising.
 
-In general, the insertion of a lambda and application is not semantics preserving:
-
-\begin{code}
-x => \v -> x v
-\end{code}
-
-Consider for instance |undefined `seq` 1|, which evaluates to |undefined|. Applying the lambda introduction rule we can replace the code with |(\v -> undefined v) `seq` 1|, which evaluates to |1|. Similarly, we could replace |1| with |\v -> 1 v|, which is neither semantics preserving nor type safe. However, a closely allied operation that is both semantics preserving and type safe is:
-
-\begin{code}
-\v -> x => \v' -> (\v -> x) v'
-\end{code}
-
-The lambda insertion phase can be seen as first transforming the function |f| using the lambda insertion rule, then inlining the outer lambda into the application site. These operations are semantics preserving, and standard within the field of program transformation.
-
-
 \subsubsection{Lambda Movement}
 \label{sec:sharing}
 
-The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (bind-box) rule will be discussed as part of the inlining stage, see \S\label{sec:inlining}. The (let-lam) rule is the one responsible for the largest loss of sharing, promoting a lambda expression outside a let.
+The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (bind-box) rule will be discussed as part of the inlining stage, see \S\label{sec:inlining}. The (let-lam) rule can be responsible for a reduction in sharing:
 
 \begin{example}
 \begin{code}
@@ -525,9 +504,7 @@ f x j = let i = expensive x
 Now |expensive| will be recomputed for every element in |xs| -- potentially a very severe speed penalty.
 \end{example}
 
-The loss of sharing is not purely theoretical. To take one example, the Uniplate library \cite{me:uniplate} makes use of a let within a lambda to keep a scoreboard which is computed once. The (let-lam) rule would make the scoreboard mechanism a severe performance penalty.
-
-As we focus on functional value removal at the expense of sharing, we perform these operations when necessary.
+The loss of sharing is not purely theoretical. To take one example, the Uniplate library \cite{me:uniplate} makes use of a let within a lambda to keep a scoreboard which is computed once. The (let-lam) rule would make the scoreboard mechanism a severe performance penalty. As we focus on functional value removal at the expense of sharing, we perform these rules when necessary.
 
 
 \subsection{Arity Raising}
@@ -539,15 +516,13 @@ function vs_ = \v -> x
     => function vs_ v = x
 \end{code}
 
-Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the arguments for the function. This transformation requires the body to be a lambda expression, so additional transformations are necessary to introduce and move lambda expressions. If a function has its arity increased, it is likely that this will cause applications of it to become partially saturated, requiring lambda expressions to be reinserted, using the (eta) simplification rule.
-
-In this particular instance, the introduction of lambda expressions changes the arity of |even| from 0 to 1, possibly requiring applications of |even| to become partially applied, causing |lambdas| to be invoked.
+Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the arguments for the function. This transformation requires the body to be a lambda expression, so additional transformations are necessary to introduce and move lambda expressions. If a function has its arity increased, it is likely that this will cause previously fully-applied uses to become partially-applied, causing the (eta) simplification rule to fire.
 
 
 \subsection{Inlining}
 \label{sec:inlining}
 
-We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
+We use inlining to remove functional values which are stored within a data value -- for example |Just (\x -> x)|. We refer to functional values inside data values as \textit{boxed lambdas}, because they are contained within a data value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the functions body is a boxed lambda; (2) the function application occurs within a case scrutinee.
 
 \begin{figure}
 \begin{code}
@@ -560,7 +535,7 @@ isBox (Fun f xs_     )  =   isBox (body f)
 \label{fig:boxed_lambda}
 \end{figure}
 
-We define an expression to be a boxed lambda if the |isBox| check returns true. The |isBox| as written may not terminate, however we can ensure it does by keeping a list of followed functions, and assuming False for each one we have already seen. This does not decrease the number of true results, but turns non-termination into False.
+We define an expression to be a boxed lambda if the |isBox| check in Figure \label{fig:boxed_lambda} returns true. The |isBox| as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not decrease the number of true results.
 
 \begin{example}
 The following expressions are boxed lambdas:
@@ -585,7 +560,7 @@ In the first negative example there is no constructor, so the first condition do
 Note that the function final expression evaluates to a boxed lambda, but that this information is hidden by the |id| function. We do not analyse within the |id| function, but assume that specialisation will deal with any boxed lambdas passed to functions.
 \end{example}
 
-We inline if the expression is a boxed lambda, more precisely, we make the following substitution:
+Our inline rule can now be specified as:
 
 \begin{simplify}
 
@@ -600,18 +575,18 @@ case (f xs_) alts_
 
 The |inline| rule deals with situations where functions evaluate to a data structure containing functional values. This situation occurs regularly with the standard dictionary implementation, but only occasionally in other situations. The inline rule does not actually remove functional values, but can bring their use and creation closer together, and thus helps them be removed.
 
-As with the simplification stage, there may be some loss of sharing if the function being inlined has an arity of 0, and is therefore in constant applicative form (CAF). A Haskell implementation will compute these functions once, and reuse their value repeatedly. If these functions are inlined, they will be recomputed.
+As with the simplification stage, there may be some loss of sharing if the function being inlined has an arity of 0, known as constant applicative form (CAF). A Haskell implementation will compute these functions once, and reuse their value as necessary. If these functions are inlined, this sharing will be lost.
 
 \subsection{Specialisation (|special|)}
 
-The original Catch tool \cite{me:catch_tfp} uses specialisation to remove higher-order functions. For each application of a function to functional arguments, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applied where function arguments are partially applied functions, rather than known constructors. Examples of common functions whose applications can usually be made first-order include |map|, |filter|, |foldr| and |foldl|.
+The original Catch tool \cite{me:catch_tfp} uses specialisation to remove higher-order functions. For each application of a function to functional arguments, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applied where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order include |map|, |filter|, |foldr| and |foldl|.
 
 The specialisation transformation makes use of \textit{templates}. A template is an expression where some sub-expressions are omitted, denoted by an underscore. The process of specialisation proceeds as follows:
 
 \begin{enumerate}
 \item Find all functions which have functional arguments, and generate templates, omitting first-order components.
 \item For each template, generate an associated function, specialised to the template.
-\item For each subexpression matching a template, replace it with the associated function.
+\item For each subexpression matching a template, replace it with the generated function.
 \end{enumerate}
 
 \begin{example}
@@ -636,6 +611,8 @@ map_id xs = case  xs of
 The resulting code has no functional values within it.
 \end{example}
 
+The specialisation stage is the only one which introduces new function names. In order to recover an expression in the input language, it is sufficient to replace all generated functions with their associated template, supplying all necessary variables.
+
 \subsubsection{Generating Templates}
 
 A template is generated if an expression is an application to a top-level function, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda. The template includes all sub-expressions whose removal would lead to higher-order elements, or which have free variables from a bound variable.
@@ -648,7 +625,7 @@ id (Maybe (\x -> x + 3))  => id (Maybe (\x -> x + _))
 id (Maybe (\x -> x + y))  => id (Maybe (\x -> x + _))
 \end{code}
 
-In all three examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, the |3| and |y| are not dependent on variables bound within the lambda, and are left as unspecified.  The |Maybe| and |+| functions are also not dependent on the bound variables, however their removal would require a functional argument as a parameter, so are left as part of the template.
+In all examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, the |3| and |y| are not dependent on variables bound within the lambda, and are left as unspecified.  The |Maybe| and |+| functions are also not dependent on the bound variables, however their removal would require a functional argument as a parameter, so are left as part of the template.
 \end{example}
 
 \subsubsection{Generating Functions}
@@ -673,7 +650,7 @@ map_id v_1 = let  f   = \x -> x
                         y:ys  -> f y : map f ys
 \end{code}
 
-Now the generation of the specialised variant is complete. To give an idea of how the final function is calculated, after the simplification rules introduced in Figure \ref{fig:lambda_simplify}, we end up with:
+Now the generation of the specialised variant is complete. To give an idea of how the final function is calculated, after the simplification rules from Figure \ref{fig:lambda_simplify}, we end up with:
 
 \begin{code}
 map_id v_1 =  let  xs = v_1
@@ -699,23 +676,23 @@ We have now eliminated all the functional values from within this operation.
 \subsection{Extending the method to allow primitive functions}
 \label{sec:primitives}
 
-The problem that primitives introduce is that they have a body which cannot be viewed by the program, and therefore cannot be examined or inlined. We can make two simple changes to support primitives. Firstly, we define that a primitive application is not a boxed lambda. Secondly, we restrict specialisation so that if a function to be specialised is actually a primitive, no template is generated. The reason for this is because the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
+Primitive functions are like normal functions, but do not have an associated body, and therefore cannot be examined or inlined. We can make two simple changes to support primitives. Firstly, we define that a primitive application is not a boxed lambda. Secondly, we restrict specialisation so that if a function to be specialised is actually a primitive, no template is generated. The reason for this restriction is that the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
 
 \section{Examples}
 \label{sec:examples}
 
-We now show a series of examples, showing our method. We have particularly focused on where our leaves residual functional values, or where a small alteration to the method would harm the results.
+We now give a series of examples. We have particularly focused on where our method leaves residual functional values, or where a small alteration to the method would harm the effectiveness.
 
 \begin{examplename}{Dead Code}
 \begin{code}
 nothing = Nothing
 
-example = case  nothing of
-                Nothing  -> 1
-                Just f   -> f (\x -> x)
+main = case  nothing of
+             Nothing  -> 1
+             Just f   -> f (\x -> x)
 \end{code}
 
-In |example| the |Nothing| branch will always be taken due to the known case scrutinee. The |Just| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. Our method cannot remove this lambda.
+In |main| the |Nothing| branch will always be taken. The |Just| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. Our method cannot remove this lambda.
 \end{examplename}
 
 \begin{examplename}{Undefined Values}
@@ -723,24 +700,25 @@ In |example| the |Nothing| branch will always be taken due to the known case scr
 \begin{code}
 bottom = bottom
 
-example = bottom (\y -> y)
+main = bottom (\y -> y)
 \end{code}
 
-In |example| a lambda is applied to |undefined|, so the program will non-terminate before the lambda is evaluated. The |bottom| function could also have been implemented as a call to the |error| primitive, with similar results.
+In |main| a lambda is applied to |undefined|, so the program will non-terminate before the lambda is evaluated. The |bottom| function could also have been implemented as a call to the |error| primitive, with similar results.
 \end{examplename}
 
 \begin{examplename}{Root function returning functional values}
+\label{ex:root_function_functional}
 \begin{code}
 main = [id]
 \end{code}
 
-In this example, the |main| function returns a functional value inside a constructor. We cannot remove the functional value without changing the semantics of the |main| function, which is called from outside the our program, and hence cannot be altered. A related situation is:
+In this example, the |main| function returns a functional value inside a constructor, i.e. a boxed lambda. We cannot remove the functional value without changing the semantics of the |main| function, which is called from outside the our program, and hence cannot be altered. A related situation is:
 
 \begin{code}
 main = id
 \end{code}
 
-Here we can only reduce this program to first-order if we are allowed to increase the arity of |main| from zero to one. This situation occurs frequently in Haskell programs, whose |main| definition is typically of type |IO ()|. In the Yhc compiler, used to generate our Core language, the definition of |IO| is:
+Here we can only reduce this program to first-order if we are allowed to increase the arity of |main| from 0 to 1. This situation occurs frequently in Haskell programs, whose |main| definition is typically of type |IO ()|. In the Yhc compiler, used to generate our Core language, the definition of |IO| is:
 
 \begin{code}
 newtype IO alpha = IO (World -> _E alpha)
@@ -754,7 +732,7 @@ At compilation time the |newtype| wrapper is removed, leaving a function from |W
 main f = f id
 \end{code}
 
-In this example, the |main| function takes a functional argument |f|, which is applied to |id| -- a functional value. Since the interface to |f| is outside the control of the code we are specialising, we cannot change its interface.
+In this example, the |main| function takes a functional argument |f|, which is applied to |id| -- a functional value. Since the interface to |f| is outside the control of the code we are transforming, we cannot remove the functional value.
 \end{examplename}
 
 \begin{examplename}{Primitives}
@@ -764,7 +742,7 @@ main = id `seq` 42
 
 Here a functional value (|id|) is passed to the primitive |seq|. As we are not able to peer inside the primitive, and must preserve its interface, we cannot remove this functional value. For most primitives, such as arithmetic operations, the types ensure that no functional values are passed as arguments. However, the |seq| primitive is of type |alpha -> beta -> beta|, allowing any type to be passed as either of the arguments, including functional values.
 
-Some primitives not only permit functional values, but actually \textit{require} them. The |primCatch| function within the Yhc standard libraries implements the Haskell exception handling function |catch|. Tye type of |primCatch| is |alpha -> (IOError -> alpha) -> alpha|, taking an exception handler as one of the arguments.
+Some primitives not only permit functional values, but actually \textit{require} them. The |primCatch| function within the Yhc standard libraries implements the Haskell exception handling function |catch|. The type of |primCatch| is |alpha -> (IOError -> alpha) -> alpha|, taking an exception handler as one of the arguments.
 \end{examplename}
 
 \begin{examplename}{Functional Lists}
@@ -777,7 +755,7 @@ snoc x xs = \ys -> xs (x:ys)
 list xs = xs []
 \end{code}
 
-This list representation provides |nil| similarly to |[]| in standard lists, but instead of providing a |(:)| or ``cons'' operation, it provides |snoc| which adds a single element on to the end of the list. The function |list| is provided to create an original list. We are unable to first order reduce such a construction, as it stores the values within the lambda, requiring an infinite amount of lambdas. We have seen such constructions in both the |lines| function of the HsColour program, and the |sort| function of Yhc.
+This list representation provides |nil| similarly to |[]| in standard lists, but instead of providing a |(:)| or ``cons'' operation, it provides |snoc| which adds a single element on to the end of the list. The function |list| is provided to create a standard list. We are unable to defunctionalize such a construction, as it stores unbounded information within closures. We have seen such constructions in both the |lines| function of the HsColour program, and the |sort| function of Yhc.
 
 However, there is an alternative implementation of these functions:
 
@@ -793,7 +771,7 @@ We have benchmarked these operations in a variety of settings and the list based
 
 \begin{examplename}{Inlining Boxed Lambdas}
 \label{ex:inlining_boxed_lambdas}
-Our original program inlined boxed lambdas everywhere they occured. This makes the detection of boxed lambdas much simpler, and does not require looking into external functions. However, it is unable to cope with certain functions:
+Our original program inlined boxed lambdas everywhere they occurred. This makes the detection of boxed lambdas much simpler, and does not require looking into external functions. However, it is unable to cope with certain programs:
 
 \begin{code}
 main xs = app (gen xs)
@@ -801,7 +779,7 @@ app = map ($ 1)
 gen = map (const x)
 \end{code}
 
-Consider the above code. The function |gen| returns a boxed lambda. However, the code is recursive, so if it was inlined repeatedly, it would not terminate. After deciding to restrict the inlining of gen, we are still left with lambdas. However, by first specialising |app| with respect to |gen|, we are able to remove the functional values. The removal of the lambda expressions has effectively lead to a deforesting between the |gen| producer of cons cells, and the |app| consumer -- eliminating the intermediate lambda expressions in the same step.
+The function |gen| returns a boxed lambda. However, the code is recursive, so if it was inlined repeatedly, it would not terminate. After deciding to restrict the inlining of gen, we are still left with lambdas. However, by first specialising |app| with respect to |gen|, we are able to remove the functional values. The removal of the lambda expressions has effectively lead to a deforesting between the |gen| producer of |(:)| nodes, and the |app| consumer -- eliminating the intermediate functional values in the same step.
 \end{examplename}
 
 
@@ -809,7 +787,7 @@ Consider the above code. The function |gen| returns a boxed lambda. However, the
 \section{Classification of Completeness}
 \label{sec:completeness}
 
-Our method would be complete if it removed all lambda expressions from a program. Completeness is not obtainable given the termination restriction (see \S\ref{sec:goals}). We have two causes of incompleteness: those that come from the fundamental algorithm, and those that are added by any termination criteria in \S\ref{sec:termination}. Here we explore causes arising from our algorithm. We wish to classify where a lambda expression may reside in a program after the application of our firstification method.
+Our method would be complete if it removed all lambda expressions from a program. Completeness is not obtainable given the termination restriction (see \S\ref{sec:goals}). We have two causes of incompleteness: those that come from the fundamental algorithm, and those that are added by the termination criteria in \S\ref{sec:termination}. Here we explore causes arising from our algorithm. We wish to classify where a lambda expression may reside in a program after the application of our firstification method.
 
 To examine where lambda expressions may occur, we model our Core expression language as a context free grammar. We define the start symbol |_s|, and require that the bodies of all functions in our language be defined by the grammar. First we map all expressions onto symbols in our grammar:
 
@@ -819,7 +797,7 @@ f xs_             => fun (body f) xs_
 c xs_             => con xs_
 x ys_             => app x ys_
 v                 => var
-case x of alts_   => case_ x (map snd alts_)
+case x of alts_   => case_ x (map rhs alts_)
 let v = x in y    => let_ x y
 \end{code}
 
@@ -851,11 +829,11 @@ _s  =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
        case_ (fun _s _s &+ app var _s &+ var) _s &+ let_ _s _s
 \end{code}
 
-Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As |(_s - lam _s)| is a common production we have factored it out as |l'|.
+Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As |(_s - lam _s)| is a common production we have factored it out as |_l'|.
 
 % _ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
 \begin{code}
-n_l  =  _s - lam _s
+_l'  =  _s - lam _s
 _s   =  lam _s &+ fun _s _s &+ con _s &+ app var _s &+ var &+
         case_(fun _s _s &+ app var _s &+ var) _l' &+ let_ _l' _l'
 \end{code}
@@ -893,7 +871,8 @@ Now we can make use of the specialise rule, which removes all lambdas and boxed 
 _s   = _l'
 _l' = _e - lam _e
 _e =  lam _e &+ fun _l' (_l' &* _b') &+ con _e &+ app var _e &+ var &+
-      case_ (fun (_l' &* _b') (_l' &* _b') &+ app var _e &+ var) _l' &+ let_ (_l' &* _b') _l'
+      case_ (fun (_l' &* _b') (_l' &* _b') &+ app var _e &+ var) _l' &+
+      let_ (_l' &* _b') _l'
 \end{code}
 
 Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function body, because |lam| is not a production in |_s|. If we restrict our attention only to expressions which permit a lambda expression as a direct child, and add explicit |lam _e| productions where we can, we are left with:
@@ -924,11 +903,9 @@ case v of
 
 bottom (\x -> x)
     where bottom = bottom
-
-main f = f (\x -> x)
 \end{code}
 
-In the first case there must be no corresponding |Just| value containing a functional value, so the first branch must be dead code. In the second example, a non-terminating function the first argument of an application, and contains a lambda as an argument to it.
+In the first case there must be no corresponding |Just| value containing a functional value, so the first branch must be dead code. In the second example, a non-terminating function the first argument of an application, and contains a lambda as an argument to it. Provided the |main| function is first-order, and the termination criteria have not applied, if a program has any residual lambda expressions, there must be at least one in one of these two situations.
 
 
 \section{Proof of Termination}
@@ -937,6 +914,7 @@ In the first case there must be no corresponding |Just| value containing a funct
 Our algorithm, as it stands, is not terminating. In order to ensure termination, it is necessary to bound both the inlining and specialisation stages. In this section we develop the termination criteria, by first looking at how non-termination may arise.
 
 \subsection{Termination of Simplification}
+\label{sec:termination_simplification}
 
 In order to check the termination of the simplifier we have used the AProVE system \cite{aprove}, to model our rules as term rewrites, and check termination thereon. A simple encoding of our rules is given in Appendix A, which checks basic termination. We have proven termination using both this simple formulation, which considers all constructors to have one alternative of exactly arity one, and a more complex encoding. In both cases, the system is able to report success.
 
@@ -950,15 +928,15 @@ let x = \x -> x x in x x
 (\x -> x x) (\x -> x x)
 \end{code}
 
-These type of expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. However, in practice, we have been unable to take a type correct Haskell program and encode it to trigger an infinite sequence in the simplification stage. In order to ensure this cannot happen, we only perform $n$ (bind-lam) or (bind-box) rules upon an expression. If the expression is altered by other stages, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached.
+These type of expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} are able to make use of type annotations to ensure these reductions terminate. In practice the above situation does not occur, but in order to guarantee termination, we only perform $n$ (bind-lam) or (bind-box) rules upon an expression. If the expression is altered by other stages, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached.
 
 \subsection{Termination of Arity Raising}
 
-Todo.
+\todo{What makes arity raising terminate. Does it terminate?}
 
 \subsection{Termination of Inlining}
 
-The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example \ref{ex:inlining_boxed_lambdas}. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
+One standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example \ref{ex:inlining_boxed_lambdas}. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
 
 \begin{example}
 \begin{code}
@@ -981,7 +959,7 @@ case f of Box _ -> Box (\x -> x)
 This expression could cause non-termination.
 \end{example}
 
-Our termination criteria permits inlining a function |f|, at all application sites within a function |g|, but only once per pair |(f,g)|. In the above example we would be permitted to inline |f| within the function |f| at all application sites (only one in this example), once. Any future attempts to inline |f| within this function would be disallowed, although |f| could be inlined within other functions. This termination criteria is sound, assuming all expressions are finite and there are a finite number of function symbols. Each inlining will occur at only a finite number of application sites, and prohibit that pair of function inlinings occurring in future. Given $n$ functions, there can only be $n^2$ possible inlining steps, each for possibly many application sites.
+Our termination criteria permits inlining a function |f|, at all application sites within a function |g|, but only once per pair |(f,g)|. In the above example we would be permitted to inline |f| within the function |f| at all application sites (only one in this example), once. Any future attempts to inline |f| within this function would be disallowed, although |f| could still be inlined within other function bodies. This termination criteria is sufficient, assuming all expressions are finite and there are a finite number of function symbols. Each inlining will occur at only a finite number of application sites, and prohibit that pair of function inlinings occurring in future. Given $n$ functions, there can only be $n^2$ possible inlining steps, each for possibly many application sites.
 
 
 \subsection{Termination of Specialisation}
@@ -998,7 +976,7 @@ f x = f (Wrap x)
 main = f (Value head)
 \end{code}
 
-In the first iteration, this would generate a version of |f| specialised to |Value head|. In the second iteration it would specialise |f| with respect to |Wrap (Value head)|, then in the third with |Wrap (Wrap (Value head))|. We would generate an infinite number of specialisations of |f|.
+In the first iteration, this would generate a version of |f| specialised to |Value head|. In the second iteration it would specialise |f| with respect to |Wrap (Value head)|, then in the third with |Wrap (Wrap (Value head))|. Specialisation would generate an infinite number of specialisations of |f|.
 \end{example}
 
 \begin{figure}
@@ -1011,15 +989,15 @@ In the first iteration, this would generate a version of |f| specialised to |Val
 \label{fig:homeomorphic}
 \end{figure}
 
-To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding has been used for termination of Supercompilation \cite{sorensen:supercompilation}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
+To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding has been used for termination of Supercompilation \cite{sorensen:supercompilation}, which makes use of some similar transformations. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
 For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
 
-One of the conditions for termination of homeomorphic embedding is that there is only a finite alphabet. To help ensure this condition, we consider all variables and literals to be equal. However, this is not sufficient. During the process of specialisation we create new functions, and these new functions are new symbols in our language. Because the homemorphic embedding is being used to ensure that infinite functions are not created, we cannot assume this property when proving it. Instead we only refer to functions in the original input program. Every generated function has a correspondence with an expression in the original program. Before performing the homeomorphic embedding we transform all templates into their original equivalent, then template upon them.
+One of the conditions for termination of homeomorphic embedding is that there is only a finite alphabet. To ensure this condition, we consider all variables and literals to be equal. However, this is not sufficient. During the process of specialisation we create new functions, and these new functions are new symbols in our language. Because the homeomorphic embedding is being used to ensure that infinite functions are not created, we cannot assume this property when proving it. Instead we only use function names from the original input program. Every template has a correspondence with an expression in the original program. We perform the homeomorphic embedding after transforming all templates into their original equivalent expression.
 
 Using homeomorphic embedding on the previous example, we would generate the specialised variant of |f (Value head)|. Upon attempting to generate the specialised variant |f (Wrap (Value head))| we would abort, with an embedding.
 
-While homeomorphic embedding is sufficient to obtain defunctionalization in many examples, there do exist examples where it terminates prematurely.
+While homeomorphic embedding is sufficient to obtain defunctionalization in most simple examples, there do exist examples where it terminates prematurely.
 
 \begin{example}
 \begin{code}
@@ -1040,15 +1018,14 @@ f' y = fst' y y
 fst' y_1 y_2 = y_2
 \end{code}
 
-Note that the homoemorphic embedding has prevented us for making a first-order variant of the program.
+Note that the homeomorphic embedding has prevented us for making a first-order variant of the program.
 \end{example}
 
-While the above example may look slightly obscure, it occurs commonly with the standard desugaring of dictionaries. Often, typeclass dictionaries have default methods, which call other methods in the typeclass. These recursive typeclass calls often pass dictionaries, embedding the original caller -- even though no recursion actually happens.
+While the above example may look slightly obscure, it occurs commonly with the standard translation of dictionaries. Often, classes have default methods, which call other methods in the same class. These recursive class calls often pass dictionaries, embedding the original caller -- even though no recursion actually happens.
 
+To alleviate this problem, instead of storing one set $S$, we instead store a sequence of sets, $S_1$ through $S_n$ -- where $n$ is a small positive number, constant for the duration of the program. Instead of adding to the set $S$, we now add to the lowest set $S_i$ where adding the element will not violate the admissible sequence. Each of the sets $S_i$ is still finite, and there are a finite number ($n$) of them, so termination is maintained.
 
-To aleviate this problem, instead of storing one set $S$, we instead store a sequence of sets, $S_1$ through $S_n$ -- where $n$ is a small positive number, constant for the duration of the program. Instead of adding to the set $S$, we now added to the lowest set $S_i$ where adding the element will not violate the admissible sequence. Each of the sets $S_i$ is still finite, and there are a finite number ($n$) of them, so termination is maintained.
-
-By default the firstification program uses 8 as the number of sets. In the results table given in \S\ref{sec:results}, for each program we have given the minimum possible value of $n$ to remove all lambda expressions. The disadvantage of a higher $n$ is that a program will unroll infinite recursion more times.
+By default the firstification program uses 8 as the number of sets. In the results table given in \S\ref{sec:results}, we have given the minimum possible value of $n$ to remove all lambda expressions within each program. The disadvantage of a higher $n$ is that a program will unroll infinite recursion more times.
 
 \subsection{Termination as a Whole}
 
@@ -1100,14 +1077,14 @@ Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & -33\% \\
 
 We have tested out method with programs drawn from the nofib benchmark \cite{nofib}, and the results are given in Table \ref{tab:results}. We have tested with all 14 tests from the imaginary section (each shown in the table), and 35 out of the 47 tests in the spectral section. The remaining 12 tests in the spectral section do not compile using the Yhc compiler, mainly due to missing or incomplete libraries.
 
-Most analysis operations work on an abstracted view of the program. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of the firstification, we have worked on unmodified Yhc libraries, including all the low-level detail. Higher-order functions occur in many places, including:
+Most analysis operations work on an abstracted view of the program. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of defunctionalization, we have worked on unmodified Yhc libraries, including all the low-level detail. Higher-order functions occur in many places, including:
 
 \begin{itemize}
-\item Typeclass dictionaries are implemented as tuples of functions.
+\item Type classes create dictionaries which are implemented as tuples of functions.
 \item The monadic bind operation is higher-order.
 \item The IO data type is implemented as a function.
 \item The Haskell |Show| type class uses continuation passing style extensively.
-\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{wadler:list_comprehensions,coutts:stream_fusion}.
+\item List comprehensions in Yhc are desugared to continuations. There are other translations which require less functional value manipulations \cite{wadler:list_comprehensions,coutts:stream_fusion}.
 \end{itemize}
 
 One torture test we have used during testing is |show (1 :: Double)|. The underlying implementation of |show| on |Double| makes use of arrays, which are implemented within the |IO| monad. Out of the tests, only 3 programs have residual functional values within them.
@@ -1130,11 +1107,11 @@ ppBesides     :: [Pretty] -> Pretty
 ppBesides = foldr1 f nil
 \end{code}
 
-Here |ppBesides| may evaluate to |undefined| if the input list to |foldr1| is |[]|. Here the |undefined| value will be of type |Pretty|, and will be given further arguments, which can be functions. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
+Here |ppBesides| may evaluate to |undefined| if the input list to |foldr1| is |[]|. The |undefined| value will be of type |Pretty|, and will be given further arguments, which can be functions. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
 
-It would be possible to remove the lambda expression by treating the |undefined| value as a functional value, perhaps using the type system to detect which values have a function type.
+While very few programs have functional values, a substantial number make use of applications to a non-function/non-constructor, and use over-application of functions. In most cases these result from supplying |error| calls with additional arguments, typically related to the desugaring of |do| notation and pattern matching within Yhc. We do not consider the use of a small number of higher-order applications to be a problem.
 
-The termination bound used on the programs varies from 2 to 11 within the sample programs. If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no realation to the size of a program and the termination bound.
+The termination bound used on the programs varies from 2 to 11 within the sample programs. If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no relation to the size of a program and the termination bound.
 
 On average the size of the resultant program is smaller by 33\%. We measured program size by taking the number of nodes in the abstract syntax tree, and the number of functions. We took the average of the two measures, which were typically very close to each other. Before counting the size we remove all functions which simply call on to other functions passing the same arguments, for example:
 
@@ -1142,9 +1119,7 @@ On average the size of the resultant program is smaller by 33\%. We measured pro
 f x y = g x y
 \end{code}
 
-Given this, we would replace all invokations of |f| with |g|. The reason for the decrease in program size is due to dictionaries holding references to unnecessary code.
-
-The results show that the termination criteria we have chosen are sufficiently relaxed to enable firstification in most programs.
+Given this, we would replace all invocations of |f| with |g|. The reason for the decrease in program size is due to dictionaries holding references to unnecessary code.
 
 \section{Related Work}
 \label{sec:related}
@@ -1174,13 +1149,13 @@ map f x = case  x of
 \noindent Now all calls to |map head| are replaced by |map Head|.
 \end{example}
 
-Reynold's method works on all programs, Defunctionalized code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
+Reynold's method works on all programs, defunctionalized code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
 
 We are unaware of any simple method for extending Reynold's style defunctionalization to primitives, without changes the primitives to be aware of the |Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
 
 Reynold's method has been used as a tool in program calculation \cite{danvy:defunctionalization_at_work,hutton:calculating_an_exceptional_machine}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
 
-The closest work to ours is that of Chin and Darlington \cite{chin:higher_order_removal}, which itself is similar to that of Nelan \cite{nelan:firstification}. They define a higher-order removal method, with similar goals of removing functional values from a program. Their work shares some of the simplification rules, the arity raising and function specialisation. Despite these commonalities, there are great differences in how their method is structured.
+The closest work to ours is \citet{chin:higher_order_removal}, which itself is similar to that of Nelan \cite{nelan:firstification}. They define a higher-order removal method, with similar goals of removing functional values from a program. Their work shares some of the simplification rules, the arity raising and function specialisation. Despite these commonalities, there are great differences in how their method is structured.
 
 \begin{itemize}
 \item Their method makes use of the types of expressions, information that must be maintained and extended to work with additional type systems.
@@ -1190,20 +1165,24 @@ The closest work to ours is that of Chin and Darlington \cite{chin:higher_order_
 \item By splitting our the simplification rules, our other stages are comparatively simple to theirs.
 \end{itemize}
 
-The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were much newer when the work was done. Our work can be seen as a successor to theirs, acheiving similar goals but with a greater complexity of input program. Our work acheives most of the aims set out in their future work section.
+The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were still experimental when their work was done. Our work can be seen as a successor to theirs, achieving similar goals but with a greater complexity of input program. Our work achieves most of the aims set out in their future work section.
 
-Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example \ref{ex:functional_lists}. We have tried their examples, and can confirm that all of them are successfully handled by our system.
+We have tried their examples, and can confirm that all of them are successfully handled by our system. None of the nofib programs could be reduced by their transformations. Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example \ref{ex:functional_lists}.
 
-The specialisation and inlining steps are taken from existing program optimisers, as it the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
+The specialisation and inlining steps are taken from existing program optimisers, as is the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
 
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-Higher order functions are very useful to the programmer, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. Our method has already found a practical user within the Catch tool, and we hope it can be of benefit to others.
+Higher order functions are very useful to the programmer, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. Our method has already found practical use within the Catch tool, and we hope it can be of benefit to others.
 
-The implementation presented in this paper is designed for clarity, not speed. By simply tracking which functions have changed, a massive performance could be obtained. The use of a numeric termination bound in the homeomorphic embedding is regretable, but highly practically motivated. We need further research to determine if such a numeric bound is necessary, or if other measures could be used, and what the bound should be.
+The implementation presented in this paper is designed for clarity, not speed. By simply tracking which functions have changed, a massive performance could be obtained. The use of a numeric termination bound in the homeomorphic embedding is regrettable, but practically motivated. We need further research to determine if such a numeric bound is necessary, or if other measures could be used, and what the bound should be.
+
+Many analysis methods, in fields such as strictness analysis and termination analysis, start out first-order and are gradually extended to work in a higher-order language. Instead of modifying each analysis method, we hope that instead we can transform the functional values away, enabling more analysis methods to work on a greater range of programs.
 
 \section*{Appendix A}
+
+The following script can be supplied to the AProVe system \cite{aprove} to check termination of our simplification rules, as described in \S\ref{sec:termination_simplification}.
 
 \begin{verbatim}
 [x,y,z]
