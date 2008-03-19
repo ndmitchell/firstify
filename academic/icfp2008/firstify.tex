@@ -1139,7 +1139,7 @@ Given this, we would replace all invokations of |f| with |g|. The reason for the
 
 The results show that the termination criteria we have chosen are sufficiently relaxed to enable firstification in most programs.
 
-\section{Reynolds style defunctionalization}
+\section{Related Work}
 
 Reynolds style defunctionalization \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
 
@@ -1150,7 +1150,7 @@ map f x = case  x of
                 (y:ys)  -> f y : map f ys
 \end{code}
 
-\noindent Defunctionalization works by creating a data type to represent all values that |f| may take anywhere in the whole program. For instance, it might be:
+\noindent Reynolds method works by creating a data type to represent all values that |f| may take anywhere in the whole program. For instance, it might be:
 
 \begin{code}
 data Function = Head | Tail
@@ -1166,111 +1166,27 @@ map f x = case  x of
 \noindent Now all calls to |map head| are replaced by |map Head|.
 \end{example}
 
-This method naturally extends to partial application. To take a more complicated example, where higher-order functions are being used to store information:
+Reynold's method works on all programs, Defunctionalized code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
 
-\begin{example}
-\begin{code}
-type Map = String -> Int
+We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the |Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
 
-new :: Map
-new _ = 0
+Reynold's method has been used as a tool in program calculation \cite{danvy:defunctionalization_at_work,hutton:calculating_an_exceptional_machine}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
 
-get :: String -> Map -> Int
-get key mp = mp key
+The closest work to ours is that of Chin and Darlington \cite{chin:higher_order_removal}, which itself is similar to that of Nelan \cite{nelan:firstification}. They define a higher-order removal method, with similar goals of removing functional values from a program. Their work shares some of the simplification rules, the arity raising and function specialisation. Despite these commonalities, there are great differences in how their method is structured.
 
-add :: String -> Int -> Map -> Map
-add key val mp s = if s == key then val else get key mp
+\begin{itemize}
+\item Their method makes use of the types of expressions, information that must be maintained and extended to work with additional type systems.
+\item Their method does not have an inline step, or any notion of boxed lambdas. Functional values within constructors are ignored, and the authors suggest the use of deforestation \cite{wadler:deforestation} to help remove them. Deforestation is not tailored to this usage, and therefore transforms the program more than necessary, and fails to eliminate many functional values.
+\item Their specialisation step does not work with boxed lambdas to functional values.
+\item To ensure termination of the specialisation step, they never specialise a recursive function which does have any functional arguments passed identically in all recursive calls. This restriction satisfies higher-order functions such as |map|, but fails in many other cases.
+\item By splitting our the simplification rules, our other stages are comparatively simple to theirs.
+\end{itemize}
 
-test = get "foo" (add "bar" 4 (add "baz" 2 new))
-\end{code}
+The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were much newer when the work was done. Our work can be seen as a successor to theirs, acheiving similar goals but with a greater complexity of input program.
 
-\noindent The above code creates a functional map, which uses a higher-order function to store a mapping from |String| to |Int|. The |add| function inserts a new key/value pair into the map. This is transformed with defunctionalization to:
+Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example ?. We have tried their examples, and can confirm that all of them are successfully handled by our system.
 
-\begin{code}
-data Function  =  New
-               |  Add3 String Int Function
-
-apply  New                 x = new x
-apply  (Add3 y_1 y_2 y_3)  x = add y_1 y_2 y_3 x
-
-new _ = 0
-
-get key mp = apply mp key
-
-add key val mp s = if s == key then val else get key mp
-
-test = get "foo" (Add3 "bar" 4 (Add3 "baz" 2 New))
-\end{code}
-
-Here we use the constructor |Add3| to represent the |add| function with three arguments pre-applied. Note that the |Function| data type now serves to store a linked-list of the values with |New| serving a similar role to |[]|, and |Add3| storing one key/value pair along with the remainder of the list.
-\end{example}
-
-We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the |Function| data type. Defunctionalized code is still type safe, but type checking would require a dependently typed language. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
-
-Reynold's method has been used as a tool in program calculation \cite{graham_hutton_calculating_an_exceptional_machine, another_one, another_one}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
-
-
-\section{Related Work}
-
-George Charles Nelan Jr. Firstification. PhD thesis, Arizona State University, Arizona, USA, December 1991.
-
-PDF] An Introduction to Program Specialisation by Type Inference - all 6 versions »
-J Hughes - Functional Programming, 1996 - repository.readscheme.org
-
-41. D.H.D. Warren. Higher-order extensions to Prolog: Are they needed? In Machine Intelligence 10, pages 441–454,
-1982.
-
-8. S. Antoy and A. Tolmach. Typed higher-order narrowing without higher-order strategies. In 4th Fuji International
-Symposium on Functional and Logic Programming (FLOPS’99), volume 1722, pages 335–350, Tsukuba, Japan, 11
-1999. Springer LNCS
-
-[CITATION] Implementation, Validation and Performance Analysis of a Firstification Technique
-GS Banavar - 1991 - Arizona State University
-
-[CITATION] Firstification
-GC Nelan - 1991 - Arizona State University
-
-A higher-order removal method - all 5 versions »
-WN Chin, J Darlington - Higher-Order and Symbolic Computation, 1996 - Springer
-Page 1. LISP AND SYMBOLIC COMPUTATION, 9, 287-322 (t996) @ 1996 Kluwer Academic
-Publishers, Boston. Manufactured in The Netherlands. ...
-
-W.N. Chin and J Darlington, A Higher-Order Removal Method,  Journal of Lisp and Symbolic Computation , Vol 9, 287-322, 1996.
-
- A higher-order removal method
-Journal	LISP and Symbolic Computation
-Publisher	Springer Netherlands
-ISSN	0892-4635
-Issue	Volume 9, Number 4 / December, 1996
-DOI	10.1007/BF01806315
-Pages	287-322
-SpringerLink Date	Wednesday, June 22, 2005
-
-@inproceedings{964009,
- author = {Fran\c{c}ois Pottier and Nadji Gauthier},
- title = {Polymorphic typed defunctionalization},
- booktitle = {POPL '04: Proceedings of the 31st ACM SIGPLAN-SIGACT symposium on Principles of programming languages},
- year = {2004},
- isbn = {1-58113-729-X},
- pages = {89--98},
- location = {Venice, Italy},
- doi = {http://doi.acm.org/10.1145/964001.964009},
- publisher = {ACM},
- address = {New York, NY, USA},
- }
-
-
-[PS] Defunctionalization of typed programs - all 5 versions »
-JM Bell, J Hook - Oregon Graduate Institute School of Science Engineering, 1994 - cse.ogi.edu
-
-
-Type-driven defunctionalization - all 6 versions »
-JM Bell, F Bellegarde, J Hook - ACM SIGPLAN Notices, 1997 - portal.acm.org
-
-
-Rabbit: A Compiler for Scheme - all 2 versions »
-GL Steele Jr - 1978 - portal.acm.org
-
+The specialisation and inlining steps are taken from existing program optimisers, as it the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
 
 \section{Conclusions}
 
