@@ -128,9 +128,6 @@ This paper starts with a definition of our Core language \S\ref{sec:core}, inclu
 
 \begin{figure}
 \begin{code}
-f (CoreLet a b c) = a
-
-
 func = f vs_ expr
 
 expr  =  Lambda vs_ x    -- lambda abstraction
@@ -157,7 +154,7 @@ The variable, case, let, application and lambda expressions are much as they wou
 
 In Example \ref{ex:incList}, our program is higher-order because of the under-saturation of both |map| and |(+)|. In the reduced version, the program is first-order.
 
-We do not permit primitives in our language, but explain how to extend our method to them in \S?. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S\ref{sec:primitives}.
+We do not permit primitives in our language, but explain how to extend our method to them in \S\ref{sec:primitives}. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in \S\ref{sec:primitives}.
 
 We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of f. We use the function |rhs| to extract the expression on the right of a case branch.
 
@@ -165,12 +162,12 @@ We use the meta functions |arity f|, |body f| and |args f| to denote the argumen
 \section{Our First-Order Reduction Method}
 \label{sec:overview}
 
-Our method works by combining three separate and well-known transformations, along with general simplification rules including many from standard Haskell compilers \cite{spj:transforming}.
+Our method works by combining three separate and well-known transformations, along with general simplification rules including many from standard Haskell compilers \cite{spj:transformation}.
 
 \begin{description}
 \item[Arity Raising:] A function is arity raised if by local transformations the arity of a function can be changed, without changing its semantics.
-\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inline}, and has been studied at length.
-\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{hudak:removing_type_classes} and more recently to specialisation functions to a given constructor \cite{spj:specconstr}.
+\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied at length.
+\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialisation functions to a given constructor \cite{spj:specconstr}.
 \end{description}
 
 Each transformation has the possibility of removing some functional values, but \textit{the key contribution of this paper is how they can be used together}, to remove functional values. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be performed in a typed Core language, although we have not done so.
@@ -289,7 +286,7 @@ Our goal is to combine the transformations we have  presented to remove as many 
 
 \paragraph{Introduce no data types.} Reynold's method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type. A natural desire would be to eliminate the higher-order aspects of a program, \textit{without} introducing any new data structures. Unfortunately, such a transformation is not possible.
 
-Given a program, we can remove all data structures by Church encoding \cite{church_encode}. If we then had a transformation which made the program first-order \textit{without} introducing any data, we would end up with a program without data or closures, which is therefore incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
+Given a program, we can remove all data structures by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data, we would end up with a program without data or closures, which is therefore incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
 
 It is therefore clear that we will not be able to remove all functional values, and meet this goal. We choose therefore to not be complete. If a totally first-order program is required, Reynold's method can be always be applied to the result of our transformation.
 
@@ -360,7 +357,7 @@ firstify = ((simplify +|+ arity) +|+ inline) +|+ specialise
 
 Within this chain we guarantee that the end result will be idempotent with respect to any of the functions, and before any function is invoked, all those to the left of it will be idempotent.
 
-The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent on its own, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent in all but the first case, so much computation is duplicated. The |(+||+)| operator also checks for global equality, when typically operations will only operate within some locality, which could be exploited. We return to discuss performance improvements in \S?.
+The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent on its own, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent in all but the first case, so much computation is duplicated. The |(+||+)| operator also checks for global equality, when typically operations will only operate within some locality, which could be exploited.
 
 We describe each of the stages in the algorithm separately. In all subsequent stages, we assume that all the simplification rules have been applied.
 
@@ -550,7 +547,7 @@ In this particular instance, the introduction of lambda expressions changes the 
 \subsection{Inlining}
 \label{sec:inlining}
 
-We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure ?. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
+We use inlining to remove functional values which are stored within a data structure -- for example |Just (\x -> id x)|. We refer to functional values inside data structures as \textit{boxed lambdas}, because they have been placed inside the value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the function evaluates to a boxed lambda; (2) the function application occurs within a case scrutinee.
 
 \begin{figure}
 \begin{code}
@@ -722,6 +719,7 @@ In |example| the |Nothing| branch will always be taken due to the known case scr
 \end{examplename}
 
 \begin{examplename}{Undefined Values}
+\label{ex:undefined_values}
 \begin{code}
 bottom = bottom
 
@@ -770,6 +768,7 @@ Some primitives not only permit functional values, but actually \textit{require}
 \end{examplename}
 
 \begin{examplename}{Functional Lists}
+\label{ex:functional_lists}
 Sometimes lambda expressions are used to build up lists which can have elements concatenated onto the end. Using Hughes lists \cite{hughes:lists}, we can define:
 
 \begin{code}
@@ -793,6 +792,7 @@ We have benchmarked these operations in a variety of settings and the list based
 
 
 \begin{examplename}{Inlining Boxed Lambdas}
+\label{ex:inlining_boxed_lambdas}
 Our original program inlined boxed lambdas everywhere they occured. This makes the detection of boxed lambdas much simpler, and does not require looking into external functions. However, it is unable to cope with certain functions:
 
 \begin{code}
@@ -924,7 +924,7 @@ case v of
 
 bottom (\x -> x)
     where bottom = bottom
-    
+
 main f = f (\x -> x)
 \end{code}
 
@@ -950,7 +950,7 @@ let x = \x -> x x in x x
 (\x -> x x) (\x -> x x)
 \end{code}
 
-These type of expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:simplifier}. However, in practice, we have been unable to take a type correct Haskell program and encode it to trigger an infinite sequence in the simplification stage. In order to ensure this cannot happen, we only perform $n$ (bind-lam) or (bind-box) rules upon an expression. If the expression is altered by other stages, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached.
+These type of expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. However, in practice, we have been unable to take a type correct Haskell program and encode it to trigger an infinite sequence in the simplification stage. In order to ensure this cannot happen, we only perform $n$ (bind-lam) or (bind-box) rules upon an expression. If the expression is altered by other stages, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached.
 
 \subsection{Termination of Arity Raising}
 
@@ -958,7 +958,7 @@ Todo.
 
 \subsection{Termination of Inlining}
 
-The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example ?. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
+The standard technique for dealing with the termination of inlining is to refuse to inline recursive functions \cite{spj:inlining}. In practice, for first order reduction, the non-recursive restriction is overly cautious and leaves residual lambda expressions, such as Example \ref{ex:inlining_boxed_lambdas}. We first present a program which causes our method to non-terminate, then our criteria for ensuring termination.
 
 \begin{example}
 \begin{code}
@@ -985,6 +985,7 @@ Our termination criteria permits inlining a function |f|, at all application sit
 
 
 \subsection{Termination of Specialisation}
+\label{sec:termination_specialisation}
 
 The specialisation method, left unrestricted, does not terminate.
 
@@ -1010,7 +1011,7 @@ In the first iteration, this would generate a version of |f| specialised to |Val
 \label{fig:homeomorphic}
 \end{figure}
 
-To ensure we only specialise a finite number of times we use a homoemorphic embedding \cite{homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homoemorphic embedding has been used for termination of Supercompilation \cite{sorensen:supercompilation}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
+To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding has been used for termination of Supercompilation \cite{sorensen:supercompilation}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
 For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
 
@@ -1047,7 +1048,7 @@ While the above example may look slightly obscure, it occurs commonly with the s
 
 To aleviate this problem, instead of storing one set $S$, we instead store a sequence of sets, $S_1$ through $S_n$ -- where $n$ is a small positive number, constant for the duration of the program. Instead of adding to the set $S$, we now added to the lowest set $S_i$ where adding the element will not violate the admissible sequence. Each of the sets $S_i$ is still finite, and there are a finite number ($n$) of them, so termination is maintained.
 
-By default the firstification program uses 8 as the number of sets. In the results table given in \S?, for each program we have given the minimum possible value of $n$ to remove all lambda expressions. The disadvantage of a higher $n$ is that a program will unroll infinite recursion more times.
+By default the firstification program uses 8 as the number of sets. In the results table given in \S\ref{sec:results}, for each program we have given the minimum possible value of $n$ to remove all lambda expressions. The disadvantage of a higher $n$ is that a program will unroll infinite recursion more times.
 
 \subsection{Termination as a Whole}
 
@@ -1065,7 +1066,7 @@ We have shown that arity raising, inlining and specialisation are finite. The re
 \smallskip
 
 \textbf{Name} is the name of the program;
-\textbf{Bound} is the numeric bound use for the termination (see \S?);
+\textbf{Bound} is the numeric bound use for the termination (see \S\ref{sec:termination_specialisation});
 \textbf{HO Create} the number of lambda expressions and under-applied functions, first in the input program and then in the output program;
 \textbf{HO Use} the number of application expressions and over-applied functions;
 \textbf{Size} the change in the program size.
@@ -1106,12 +1107,12 @@ Most analysis operations work on an abstracted view of the program. For example,
 \item The monadic bind operation is higher-order.
 \item The IO data type is implemented as a function.
 \item The Haskell |Show| type class uses continuation passing style extensively.
-\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{list_comps,duncan_deforestation}.
+\item List comprehensions in Yhc are desugared to continuations. There are other translations which would probably be preferable if first-order code was desired \cite{wadler:list_comprehensions,coutts:stream_fusion}.
 \end{itemize}
 
 One torture test we have used during testing is |show (1 :: Double)|. The underlying implementation of |show| on |Double| makes use of arrays, which are implemented within the |IO| monad. Out of the tests, only 3 programs have residual functional values within them.
 
-The integer program passes functional values to the primitive |seq|, similar to Example ?, using the following function:
+The integer program passes functional values to the primitive |seq|, similar to Example \ref{ex:functional_lists}, using the following function:
 
 \begin{code}
 seqlist [] = return ()
@@ -1120,7 +1121,7 @@ seqlist (x:xs) = x `seq` seqlist xs
 
 This function is invoked with the IO monad, so the |return ()| expression is a functional value. It is impossible to remove this functional value without having access to the implementation of the |seq| primitive.
 
-The pretty and constraints programs both apply a functional value to an expression that evaluates to |undefined|, similar to Example ?. The case in pretty comes from the fragment:
+The pretty and constraints programs both apply a functional value to an expression that evaluates to |undefined|, similar to Example \ref{ex:undefined_values}. The case in pretty comes from the fragment:
 
 \begin{code}
 type Pretty = Int -> Bool -> PrettyRep
@@ -1191,7 +1192,7 @@ The closest work to ours is that of Chin and Darlington \cite{chin:higher_order_
 
 The limitations of their work are entirely understandable, given the nature of programming at the time their work was written. While nowadays people use monads, IO continuations and type classes as a matter of course, these features were much newer when the work was done. Our work can be seen as a successor to theirs, acheiving similar goals but with a greater complexity of input program. Our work acheives most of the aims set out in their future work section.
 
-Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example ?. We have tried their examples, and can confirm that all of them are successfully handled by our system.
+Some of their observations and extensions apply equally to our work, for example they suggest possible methods of removing accumulating functions such as in Example \ref{ex:functional_lists}. We have tried their examples, and can confirm that all of them are successfully handled by our system.
 
 The specialisation and inlining steps are taken from existing program optimisers, as it the termination strategy of homeomorphic embedding. A lot of program optimisers remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. Unfortunately this approach has a number of disadvantages. Firstly, the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. The other more serious problem was that the results were poor -- given the restricted setting of only removing functional values, the techniques can be pushed much further.
 
