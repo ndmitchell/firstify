@@ -41,6 +41,10 @@
      \end{flushright}
     }
 
+\newenvironment{definition}
+    {\textbf{Definition:}}
+    {\noexample}
+
 \begin{comment}
 % for paper haskell
 \begin{code}
@@ -184,7 +188,9 @@ The variable, case, let, application and lambda expressions are much as they wou
 
 Informally, a program is higher-order if at runtime the program generates and manipulates functional values. As functional values can only be created in two ways; (1) a lambda expression and (2) a partially-applied function application, we make the following definition:
 
-\paragraph{Definition: First-Order} A program which contains no lambda expressions and no partially-applied functions is first-order.\noexample
+\begin{definition}
+A program which contains no lambda expressions and no partially-applied functions is first-order.
+\end{definition}
 
 \begin{examplerevisit}{\ref{ex:incList}}
 The original program is higher-order because of the under-saturation of both |map| and |(+)|. In the defunctionalised version, the program is first-order.
@@ -195,37 +201,41 @@ The original program is higher-order because of the under-saturation of both |ma
 \section{Our First-Order Reduction Method}
 \label{sec:overview}
 
-Our method works by combining three separate and well-known transformations. Additionally we use general simplification rules, most of which may be found in any optimising compiler \cite{spj:transformation}.
+Our method works by combining three separate and well-known transformations. Each transformation on its own is correctness preserving, and none introduce any additional data types. Additionally we use general simplification rules, most of which may be found in any optimising compiler \cite{spj:transformation}.
 
 \begin{description}
-\item[Arity Raising:] A function is arity raised if the body of the function is a lambda expression. In this situation, the variables within the lambda expression can be added as arguments to the function.
+\item[Arity Raising:] A function can be arity raised if the body of the function is a lambda expression. In this situation, the variables within the lambda expression can be added as arguments to the function.
 \item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied in depth.
 \item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialise functions to a given constructor \cite{spj:specconstr}.
 \end{description}
 
-Each transformation has the possibility of removing some functional values, but the key contribution of this paper is \textit{how they can be used together}. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be implemented upon a typed Core language, although we have not done so.
+Each transformation has the possibility of removing some functional values, but the key contribution of this paper is \textit{how they can be used together}. Using the fixed point operator |(+||+)| introduced in \S\ref{sec:detailed}, their combination is:
 
-We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss each step in detail in \S\ref{sec:detailed}, including how they can be combined. We leave the issue of termination until \S\ref{sec:termination}.
+\begin{code}
+firstify = simplify +|+ arity +|+ inline +|+ specialise
+\end{code}
+
+We proceed by first giving a brief flavour of how these transformations used in isolation may remove some functional values. We then discuss them in detail in \S\ref{sec:detailed}, including how they can be combined.
 
 \todo{If possible, come up with a running example -- hard to find one which hits them all and isn't too complex.}
 
 \subsection{Simplification}
 
-The simplification step serves to group all the short and simple transformations that most optimising compilers apply. Some of these steps have the ability to remove functional values, while others simply ensure a normal form for future transformations.
+Simplification serves to group several simple transformations that most optimising compilers apply. Some of these steps have the ability to remove functional values; others simply ensure a normal form for future transformations.
 
 \begin{example}
 \begin{code}
 one = (\x -> x) 1
 \end{code}
 
-The simplification rules transform this function to:
+One of our simplification rules transforms this function to:
 
 \begin{code}
 one = let x = 1 in x
 \end{code}
 \end{example}
 
-Other rules within the program do not eliminate lambda expressions, but manipulate them -- putting them in a form other stages can remove.
+Other rules do not eliminate lambda expressions, but put them into a form that other stages can remove.
 
 \begin{example}
 \begin{code}
@@ -233,7 +243,7 @@ even =  let one = 1
         in \x -> not (odd x)
 \end{code}
 
-Here the let expression is surrounding the lambda expression. We can lift the lambda expression out of the let expression.
+A simplification rule lifts the lambda outside of the let expression.
 
 \begin{code}
 even = \x ->  let one = 1
@@ -246,14 +256,14 @@ In general this transformation may cause duplicate computation to be performed, 
 
 \subsection{Arity Raising}
 
-The arity raising transformation is an attempt to increase the arity of a function. It relies heavily on the simplification stage.
+The arity raising transformation increases the definition arity of functions with lambdas as bodies.
 
 \begin{example}
 \begin{code}
 even = \x -> not (odd x)
 \end{code}
 
-Here the arity raising transformation changes the body of the function from being a lambda, and lifts the argument to the lambda into an argument of the function -- increasing the arity.
+Here the arity raising transformation lifts the argument to the lambda into a definition-level argument, increasing the arity.
 
 \begin{code}
 even x = not (odd x)
@@ -263,43 +273,40 @@ even x = not (odd x)
 
 \subsection{Inlining}
 
-Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into the application of a function taking a tuple containing many functional values. This operation occurs as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}.
-
-
-We use inlining to remove functions which return data constructors containing functional values.
+We use inlining to remove functions which return data constructors containing functional values. A frequent cause of data constructors containing functional values is due to the dictionary implementation of type classes \cite{wadler:type_classes}.
 
 \begin{example}
 \begin{code}
-f = case  eqInt of
-          (a,b) -> a 1 2
+main = case  eqInt of
+             (a,b) -> a 1 2
 
 eqInt = (primEqInt, primNeqInt)
 \end{code}
 
-In the above example the |eqInt| function evaluates to a tuple, where both |primEqInt| and |primNeqInt| are functional values. We can start to remove these functional values by inlining the function |eqInt|:
+Both components of the |eqInt| tuple, |primEqInt| and |primNeqInt|, are functional values. We can start to remove these functional values by inlining |eqInt|:
 
 \begin{code}
-f = case  (primEqInt, primNeqInt) of
-          (a,b) -> a 1 2
+main = case  (primEqInt, primNeqInt) of
+             (a,b) -> a 1 2
 \end{code}
 
-We can now simplify the program into a first-order variant, using a rule dealing with a case scrutinising a known constructor. This rule is applied by the simplification stage.
+The simplification stage can now turn the program into a first-order variant, using a rule dealing with a case scrutinising a known constructor.
 
 \begin{code}
-f = primEqInt 1 2
+main = primEqInt 1 2
 \end{code}
 \end{example}
 
 \subsection{Specialisation}
 
-Specialisation works by replacing a function application with a specialised variant, where some of the arguments are passed at compile time.
+Specialisation works by replacing a function application with a specialised variant. In effect, at least one argument is passed at transformation time.
 
 \begin{example}
 \begin{code}
 notList xs = map not xs
 \end{code}
 
-Here the |map| function takes a functional value as its first argument. In the case of |notList| this functional value is |not|. We can create a variant of |map| specialised to |not| as its first argument:
+Here the |map| function takes the functional value |not| as its first argument. We can create a variant of |map| specialised to this argument:
 
 \begin{code}
 map_not x = case  x of
@@ -309,31 +316,36 @@ map_not x = case  x of
 notList xs = map_not xs
 \end{code}
 
-The recursive call in |map| is replaced by a recursive call to the specialised variant. We have now eliminated all functional values.
+The recursive call in |map| is replaced by a recursive call to the specialised variant. We have eliminated all functional values.
 \end{example}
 
 \subsection{Goals}
 \label{sec:goals}
 
-Our goal is to combine the transformations we have  presented to remove as many functional values as possible. For example, the initial |incList| example requires simplification, arity raising and specialisation. We have defined a number of goals, in order of priority. Some of the earlier goals mean that later goals are unachievable -- in these cases we will merely do the best we can.
+We have defined a number of goals: some \textit{essential}, and others \textit{desirable}. If essential goals make desirable goals unachievable, we still aim to do the best we can.
 
-\paragraph{Correct and terminating.} Like all transformation methods, both correctness and termination are essential to make the transformation useful. By making use of three established transformations, correctness is relatively easy to show. The issue of termination is much harder -- both inlining and specialisation can be applied in ways that will diverge. In \S\ref{sec:termination} we develop a set of criteria to ensure termination.
+\subsubsection*{Essential}
 
-\paragraph{Correspondence to the original program.} Since our transformation is designed to be performed before analysis, it is important that the results of the analysis can be presented in terms of the original program. We provide a method for transforming expressions in the resultant program into equivalent expressions in the original program.
+\paragraph{Preserve the result computed by the program.} By making use of three established transformations, correctness is relatively easy to show.
 
-\paragraph{Introduce no data types.} Reynold's method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type into the program. A natural desire would be to eliminate the higher-order aspects of a program, \textit{without} introducing any new data types. By composing our transformation out of existing transformations, none of which introduce data types, we can easily ensure that our resultant transformation does not introduce data types. Unfortunately, such a transformation is not possible.
+\paragraph{Ensure the transformation terminates.} The issue of termination is much harder. Both inlining and specialisation could be applied in ways that diverge. In \S\ref{sec:termination} we develop a set of criteria to ensure termination.
 
-Given a program, we can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
+\paragraph{Correspondence to the original program.} Our transformation is designed to be performed before analysis. It is important that the results of the analysis can be presented in terms of the original program. We need a method for transforming expressions in the resultant program into equivalent expressions in the original program.
 
-We cannot both remove all functional values and meet this goal. We choose to not introduce any data types, and accept that some functional values may remain in the resultant programs. If a totally first-order program is required, Reynold's method can be always be applied after our transformation.
+\paragraph{Introduce no data types.} Reynolds method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type into the program. We aim to eliminate the higher-order aspects of a program, \textit{without} introducing any new data types. By composing our transformation out of existing transformations, none of which introduce data types, we can easily ensure that our resultant transformation does not introduce data types.
 
-\paragraph{Remove all functional values.} We have already indicated that the removal of all functional values is an impossible goal within our previous constraints. However, we will attempt to remove as many functional values as possible. In \S\ref{sec:completeness} we classify where functional values may appear in the resultant programs.
 
-\paragraph{Preserve the type information.} Given an original program with explicit types, we desire that the resultant program can still be assigned a type. Similar passes to our stages are implemented in a type preserving manner inside the GHC compiler \cite{ghc}, so we believe this task should be relatively easy. We note that Reynold's method is not so amenable to type preservation.
+\subsubsection*{Desirable}
+
+\paragraph{Remove all functional values.} Given a program, we can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
+
+We aim to remove as many functional values as possible. In \S\ref{sec:completeness} we make precise where functional values may appear in the resultant programs. If a totally first-order program is required, Reynolds method can be always be applied after our transformation.
 
 \paragraph{Preserve the space/sharing behaviour of the program.} In the expression |let y = f x in y + y|, according to the rules of lazy evaluation, |f x| will be evaluated at most once. We could inline the let binding to give |f x + f x|, but this expression evaluates |f x| twice. Where possible, we will avoid changing the sharing of the program. Our goals are primarily for analysis of the resultant code, not to compile and execute the result. Because we are not interested in performance, we permit the loss of sharing in computations, if to do so will remove functional values.
 
-\paragraph{Other Desirable Qualities.} Previous defunctionalisation attempts have shown a concern about code size increase \cite{chin:higher_order_removal}. A smaller resultant program would be desirable, but not at the cost of clarity. The speed of the implementation is not of much importance to us, provided it performs in a respectable time to permit proper evaluation.
+\paragraph{Minimize the size of the program.} Previous defunctionalisation attempts have shown a concern about code size increase \cite{chin:higher_order_removal}. A smaller resultant program would be desirable, but not at the cost of clarity.
+
+\paragraph{Make the transformation fast.} The implementation must be fast enough to permit proper evaluation.
 
 
 \section{Method in Detail}
@@ -347,9 +359,9 @@ simplify,arity,inline,specialise :: Prog -> Prog
 \end{code}
 \end{comment}
 
-Our method proceeds in four steps, simplification (|simplify|), arity raising (|arity|), inlining (|inline|) and specialisation (|specialise|). These steps are combined using a fixed point operator.
+Our method proceeds in four iteratively nested steps, simplification (|simplify|), arity raising (|arity|), inlining (|inline|) and specialisation (|specialise|). Our goal is to combine these steps to remove as many functional values as possible. For example, the initial |incList| example requires simplification, arity raising and specialisation.
 
-For the implementation, we have implemented our steps within a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. To simplify the presentation, we have ignored these issues -- while these are tedious engineering concerns, they do not effect the underlying algorithm.
+We have implemented our steps in a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. But to simplify the presentation, we have ignored these issues -- they are mostly tedious engineering concerns, and do not effect the underlying algorithm.
 
 Our method is written as:
 
@@ -357,7 +369,7 @@ Our method is written as:
 firstify = simplify +|+ arity +|+ inline +|+ specialise
 \end{code}
 
-Each stage will be described separately. The overall control of the algorithm is given by the |(+||+)| operator, defined as:
+Each stage will be described separately. The overall control of the algorithm is given by the |(+||+)| operator, defined as follows.
 
 \begin{code}
 infixl +|+
@@ -370,37 +382,35 @@ fix f x = if x == x' then x else fix f x'
     where x' = f x
 \end{code}
 
-The expression |f +||+ g| applies the |f| to an input until it reaches a fixed point, then applies |g|. If the |g| changes the value, then |f| is tried again until a fixed point is achieved. This formulation has several important properties:
+The expression |f +||+ g| applies |f| to an input until it reaches a fixed point, then applies |g|. If |g| changes the value, then |f| is tried again until a fixed point is achieved. This formulation has several important properties:
 
 \begin{description}
-\item[Idempotent in each function] After the operation has completed, applying either |f| or |g| will not change the value.
+\item[Joint fixpoint] After the operation has completed, applying either |f| or |g| does not change the value.
 
 \begin{code}
-propIdempotent f g x = let r = (+|+) f g x in f r == r && g r == r
+propJointFixpoint f g x = let r = (+|+) f g x in (f r == r) && (g r == r)
 \end{code}
 
-\item[Idempotent] The operation as a whole is idempotent.
+\item[Overall fixpoint] The operation as a whole achieves a fixpoint. \todo{Is this not saying that |f +||+ g| is idempotent?}
 
 \begin{code}
-propIdemp2 f g x = let r = (+|+) f g x in r == (+|+) f g r
+propOverallFixpoint f g x = let op = f +|+ g in op (op x) == op x
 \end{code}
 
-\item[Function choice] If both |f| and |g| could be applied, |f| will be chosen.
-
-\item[Function ordering] The function |f| will have reached a fixed point before the function |g| is applied. If a postcondition of |f| implies a precondition of |g|, then we can guarantee |g|'s precondition will always be met.
+\item[Function ordering] The function |f| reaches a fixed point before the function |g| is applied. If a postcondition of |f| implies a precondition of |g|, then we can guarantee |g|'s precondition is always met.
 \end{description}
 
-These properties allow us to combine the individual steps with less regard to their interaction. The function ordering allows us to overlap the application sites of two stages, but prefer one stage over another. The first two properties ensure that after the method terminates no further transformation will be possible.
+These properties allow us to separate the separate the individual transformations from the overall application strategy. The first two properties ensure that the method terminates only once no transformation is applicable. The function ordering allows us to overlap the application sites of two stages, but prefer one stage over another.
 
-The operator is left associative, meaning that the code can be rewritten with explicit bracketing as:
+The |(+||+)| operator is left associative, meaning that the code can be rewritten with explicit bracketing as:
 
 \begin{code}
 firstify = ((simplify +|+ arity) +|+ inline) +|+ specialise
 \end{code}
 
-Within this chain we guarantee that the end result will be idempotent with respect to any of the functions, and before any function is invoked, all those to the left of it will be idempotent.
+Within this chain we can guarantee that the end result will be a fixed point with any of the transformations. Additionally, before each transformation is applied, those to the left will have reached fixed points.
 
-The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent on its own, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent in all but the first case, so much computation is duplicated. The |(+||+)| operator also checks for global equality, when typically operations will only operate within some locality, which could be exploited.
+The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent if it is the result of |(+||+)|, so much computation is duplicated. The |(+||+)| operator also checks for global equality, when typically operations will only operate within some locality, which could be exploited.
 
 We describe each of the stages in the algorithm separately. In all subsequent stages, we assume that all the simplification rules have been applied.
 
@@ -454,7 +464,7 @@ case (let v = x in y) of alts_
 
 \simp{case-case}{
 \ignore\begin{code}
-case (case x of {... ; c vs_ -> y ; ...) of alts_
+case (case x of {... ; c vs_ -> y ; ...}) of alts_
     => case x of {... ; c vs_ -> case y of alts_ ; ...}
 \end{code}}
 
@@ -504,11 +514,11 @@ let v = x in \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
-The simplification stage has the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied at any subexpression, as long as any rule matches.
+The simplification stage has the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. \todo{Confluence?}
 
 \subsubsection{Lambda Introduction}
 
-The (eta) rule inserts lambdas where possible, using $\eta$-expansion. The input program from the Yhc compiler has been lambda lifted \cite{lambda_lift}, replacing lambda expressions with partial application. This rule removes all occurrences of partial-application, replacing them with explicit lambda expressions. The second stage moves these lambda expressions around, attempting to lift them to the top level.
+The (eta) rule inserts lambdas where possible, using $\eta$-expansion. If the input program has been generated by the Yhc compiler it has been lambda lifted \cite{lambda_lift}, replacing lambda expressions with partial application. This rule removes all occurrences of partial-application, replacing them with explicit lambda expressions. The simplification rules move these lambda expressions around, attempting to lift them to the top level.
 
 \begin{example}
 \begin{code}
@@ -521,7 +531,7 @@ Here the functions |(.)|, |not| and |odd| are all partially applied. Lambda expr
 even = \x -> (.) (\y -> not y) (\z -> odd z) x
 \end{code}
 
-Here the |even| function, which previously had three instances of partial application, has three lambda expressions inserted. Now each function is applied to a number of arguments equal to its arity. This transformation will enable the arity raising transformation, resulting in:
+Here the |even| function, which previously had three instances of partial application, has three lambda expressions inserted. Now each function is fully-applied. This transformation enables the arity raising transformation, resulting in:
 
 \begin{code}
 even x = (.) (\y -> not y) (\z -> odd z) x
@@ -533,45 +543,45 @@ For each partially applied function, a lambda expression is inserted to ensure t
 \subsubsection{Lambda Movement}
 \label{sec:sharing}
 
-The rule (case-lam) lifts a lambda out from within a case alternative to outside the case value. The (bind-lam) rule inlines a lambda bound in a let expression. The (bind-box) rule will be discussed as part of the inlining stage, see \S\label{sec:inlining}. The (let-lam) rule can be responsible for a reduction in sharing:
+The (case-lam) rule lifts a lambda within a case alternative outside the case expression. The (bind-lam) rule inlines a lambda bound in a let expression. The (bind-box) rule will be discussed as part of the inlining stage, see \S\label{sec:inlining}. The (let-lam) rule can be responsible for a reduction in sharing:
 
 \begin{example}
 \begin{code}
-f x = let i = expensive x
-      in \j -> i + j
+f x =  let i = expensive x
+       in \j -> i + j
 
 main xs = map (f 1) xs
 \end{code}
 
-In the above example, |expensive 1| is computed once and saved. Every application of the functional argument within |map| performs a single |(+)| operation. After applying the (let-lam) rule we get:
+Here |expensive 1| is computed once and saved. Every application of the functional argument within |map| performs a single |(+)| operation. After applying the (let-lam) rule we get:
 
 \begin{code}
-f x j = let i = expensive x
-        in i + j
+f x =  \j ->  let i = expensive x
+              in i + j
 \end{code}
 
-Now |expensive| will be recomputed for every element in |xs| -- potentially a very severe speed penalty.
+Now |expensive| is recomputed for every element in |xs|. We include this rule in our simplifier, focusing on functional value removal at the expense of sharing.
 \end{example}
-
-The loss of sharing is not purely theoretical. To take one example, the Uniplate library \cite{me:uniplate} makes use of a let within a lambda to keep a scoreboard which is computed once. The (let-lam) rule would make the scoreboard mechanism a severe performance penalty. As we focus on functional value removal at the expense of sharing, we perform these rules when necessary.
 
 
 \subsection{Arity Raising}
 
-The arity raising step is simple:
+\begin{definition}
+The arity raising step is:
 
 \ignore\begin{code}
 function vs_ = \v -> x
     => function vs_ v = x
 \end{code}
+\end{definition}
 
-Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the arguments for the function. This transformation requires the body to be a lambda expression, so additional transformations are necessary to introduce and move lambda expressions. If a function has its arity increased, it is likely that this will cause previously fully-applied uses to become partially-applied, causing the (eta) simplification rule to fire.
+Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the definition-level arguments for the function. This transformation requires the body to be a lambda expression, so additional transformations are necessary to introduce and move lambda expressions. If a function has its arity increased, fully-applied uses become partially-applied, causing the (eta) simplification rule to fire.
 
 
 \subsection{Inlining}
 \label{sec:inlining}
 
-We use inlining to remove functional values which are stored within a data value -- for example |Just (\x -> x)|. We refer to functional values inside data values as \textit{boxed lambdas}, because they are contained within a data value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the functions body is a boxed lambda; (2) the function application occurs within a case scrutinee.
+We use inlining as the first stage in the removal of functional values stored within a data value -- for example |Just (\x -> x)|. We refer to functional values inside data values as \textit{boxed lambdas}, because they are contained within a data value. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the function's body is a boxed lambda; (2) the function application occurs within a case scrutinee.
 
 \begin{figure}
 \begin{code}
@@ -588,10 +598,14 @@ isLambda _               = False
 \label{fig:boxed_lambda}
 \end{figure}
 
-We define an expression to be a boxed lambda if the |isBox| check in Figure \label{fig:boxed_lambda} returns true. The |isBox| as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not decrease the number of true results.
+\begin{definition}
+An expression |e| is a boxed lambda if |isBox e == True|, where |isBox| is defined as in Figure \label{fig:boxed_lambda}.
+\end{definition}
+
+The |isBox| as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not change the result of any previously terminating evaluations.
 
 \begin{example}
-The following expressions are boxed lambdas:
+Recalling that |[e]| is shorthand for |(:) e []|, where |(:)| is the cons constructor, the following expressions are boxed lambdas:
 
 \ignore\begin{code}
 [\x -> x]
@@ -600,7 +614,7 @@ The following expressions are boxed lambdas:
 [Nothing, Just (\x -> x)]
 \end{code}
 
-The following examples are not boxed lambdas:
+The following are \textit{not} boxed lambdas:
 
 \ignore\begin{code}
 \x -> id x
@@ -608,31 +622,24 @@ The following examples are not boxed lambdas:
 id [\x -> x]
 \end{code}
 
-In the first negative example there is no constructor, so the first condition does not apply. In the second there is a constructor, but the lambda expression is not an argument to the constructor. In the third there is a lambda expression as an argument to a constructor, but that subexpression is an argument to a function application.
-
-Note that the function final expression evaluates to a boxed lambda, but that this information is hidden by the |id| function. We do not analyse within the |id| function, but assume that specialisation will deal with any boxed lambdas passed to functions.
+The final expression \textit{evaluates to} a boxed lambda, but this information is hidden by the |id| function. We assume that specialisation will deal with any boxed lambdas passed to functions.
 \end{example}
 
-Our inline rule can now be specified as:
+\begin{definition}
+The inlining transformation is specified by:
 
-\begin{simplify}
-
-\simp{case-boxed}{
 \ignore\begin{code}
 case (f xs_) alts_
     => case (let args f = xs_ in body f) alts_
     where isBox (body f)
-\end{code}}
+\end{code}
+\end{definition}
 
-\end{simplify}
-
-The |inline| rule deals with situations where functions evaluate to a data structure containing functional values. This situation occurs regularly with the standard dictionary implementation, but only occasionally in other situations. The inline rule does not actually remove functional values, but can bring their use and creation closer together, and thus helps them be removed.
-
-As with the simplification stage, there may be some loss of sharing if the function being inlined has an arity of 0, known as constant applicative form (CAF). A Haskell implementation will compute these functions once, and reuse their value as necessary. If these functions are inlined, this sharing will be lost.
+As with the simplification stage, there may be some loss of sharing if the definition being inlined has an arity of 0, known as a constant applicative form (CAF). A Haskell implementation computes these expressions only once, and reuses their value as necessary. If they are inlined, this sharing will be lost.
 
 \subsection{Specialisation (|specialise|)}
 
-The original Catch tool \cite{me:catch_tfp} uses specialisation to remove higher-order functions. For each application of a function to functional arguments, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applied where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order include |map|, |filter|, |foldr| and |foldl|.
+For each application of a function to arguments containing lambdas, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applies where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order include |map|, |filter|, |foldr| and |foldl|.
 
 The specialisation transformation makes use of \textit{templates}. A template is an expression where some sub-expressions are omitted, denoted by an underscore. The process of specialisation proceeds as follows:
 
