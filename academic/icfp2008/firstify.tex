@@ -60,7 +60,7 @@ primNeqInt, primEqInt :: Int -> Int -> Bool
 \titlebanner{\today{} - \currenttime{}}        % These are ignored unless
 \preprintfooter{}   % 'preprint' option specified.
 
-\title{Loosing functions without gaining data}
+\title{Losing functions without gaining data}
 \subtitle{ -- a new method for defunctionalisation}
 
 \authorinfo{Neil Mitchell\titlenote{The first author is supported by an EPSRC PhD studentship}}
@@ -73,7 +73,7 @@ primNeqInt, primEqInt :: Int -> Int -> Bool
 \maketitle
 
 \begin{abstract}
-We describe an automated transformation which takes a higher-order program, and a produces an equivalent program with fewer functional values. Our method has a number of advantages over Reynold's style defunctionalization -- it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. While our method cannot always succeed in removing all functional values, in practice it is remarkably successful. We have evaluated our method on programs from the nofib benchmark, where only 3 out of 49 remain higher-order.
+We describe an automated transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice it is remarkably successful. We have evaluated our method on programs from the nofib benchmark, where only 3 out of 49 programs remain higher-order.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -82,14 +82,17 @@ We describe an automated transformation which takes a higher-order program, and 
 languages, transformation
 
 \keywords
-Haskell, first-order reduction, firstification, defunctionalization, functional programming
+Haskell, firstification, defunctionalisation
 
 \section{Introduction}
 
-Higher-order functions are well used and much loved within functional programming languages, such as Haskell \cite{haskell}. Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into the application of a function taking a tuple containing many functional values. This operation occurs as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}. While having functions as first-class values leads to more concise code, it often complicates analysis methods, such as checking pattern-match safety \cite{me:catch_icfp} and termination checking \cite{sereni:higher_order_termination}.
+Higher-order functions are widely used in functional programming languages.  Having functions as first-class values leads to more concise code, but it often complicates analysis methods, such as those for checking pattern-match safety \cite{me:catch_icfp} or termination \cite{sereni:higher_order_termination}.
 
 \begin{example}
 \label{ex:incList}
+
+Consider this definition of |incList|:
+
 \begin{code}
 incList :: [Int] -> [Int]
 incList = map (+1)
@@ -100,7 +103,7 @@ map f x = case  x of
                 y:ys  -> f y : map f ys
 \end{code}
 
-Consider the above definition of |incList|, which contains many higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has lead to short code, but we could equally have written:
+The definition of |incList| has higher-order features. The function |(+1)| is passed as a functional argument to |map|. The |incList| value is a functional value, bound to a function taking a list to a list. The use of first-class functions has led to short code, but we could equally have written:
 
 \begin{code}
 incList :: [Int] -> [Int]
@@ -108,43 +111,47 @@ incList []      = []
 incList (x:xs)  = x+1 : incList xs
 \end{code}
 
-While the second variant of |incList| is much longer, it may also be more amenable to certain types of analysis -- and indeed may also perform faster at runtime. The transformation pass presented in this paper performs the above transformation automatically.
+Although this first-order variant of |incList| is much longer, it is also more amenable to certain types of analysis -- and indeed may also perform faster at runtime. The method presented in this paper transforms the higher-order definition into the first-order one automatically.
 \end{example}
 
-Our first-order reduction method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new, as far back as 1972 Reynold's gave a solution, known as Reynold's style defunctionalization \cite{reynolds:defunc}. Unfortunately, Reynold's method effectively introduces a mini-interpreter within the resultant program, which causes problems for analysis tools. Our method instead tries to produce a program closer to what a human may have written, if not allowed the benefit of functional values.
+Our defunctionalisation method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new. As far back as 1972 Reynolds gave a solution, now known as \textit{Reynolds style defunctionalisation} \cite{reynolds:defunc}. Unfortunately, Reynolds method effectively introduces a mini-interpreter, which causes problems for analysis tools. Our method produces a program closer to what a human might have written, if denied the use of functional values.
 
-Our method has been implemented in Haskell, and operates over the Core language from the York Haskell Compiler \cite{me:yhc_core}. We have used our transformation within the Catch analysis tool, which checks for potential pattern-match errors in Haskell. In addition, we have made our defunctionalization method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/cgi-bin/hackage-scripts/package/firstify}} -- and hope others from the termination checking community may be able to make use of it.
+Our method has been implemented in Haskell \cite{haskell}, and operates over the Core language from the York Haskell Compiler \cite{me:yhc_core}. We have used our transformation within the Catch analysis tool \cite{me:catch_icfp}, which checks for potential pattern-match errors in Haskell. We have made our defunctionalisation method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/}, under ``firstify''}.
 
 \subsection{Contributions}
 
-Our paper makes a number of contributions:
+Our paper makes the following contributions:
 
 \begin{itemize}
-\item We define a method to remove most functional values from a program. Unlike previous work our method does not introduce new types, and can deal well with complexities such as type classes, continuations and monads.
-\item Our method makes use of standard transformation steps, but the key is in their combination. In particular, we describe what restrictions are required, to ensure better defunctionalization, and to guarantee termination.
-\item We have implemented our method, and present results for much of the nofib benchmark suite. These results enable us to measure the effectiveness of our method.
+\item We define a defunctionalisation method which, unlike some previous work, does not introduce new types.
+\item Our method can deal well with the complexities of a language like Haskell, including type classes, continuations and monads.
+\item Our method makes use of standard transformation steps, but combined in a novel way.
+\item We identify restrictions required to guarantee termination, without restricting defunctionalisation.
+\item We have implemented our method, and present measured results for much of the nofib benchmark suite.
 \end{itemize}
 
 \subsection{Roadmap}
 
-This paper begins with a definition of our Core language \S\ref{sec:core}, including what we consider to be a first-order program. Next we present an overview of our method \S\ref{sec:overview}, followed by a more detailed account \S\ref{sec:detailed}, along with a number of examples in \S\ref{sec:examples}. We classify where functional values may remain in a resultant program \S\ref{sec:completeness} and show how to modify our method to guarantee termination \S\ref{sec:termination}. Finally we give results \S\ref{sec:results}, review related work \S\ref{sec:related} and conclude \S\ref{sec:conclusion}.
+The sections following begin with a definition of our Core language (\S\ref{sec:core}), including what we consider to be a first-order program. Next we present an overview of our method (\S\ref{sec:overview}), followed by a more detailed account (\S\ref{sec:detailed}), along with a number of examples (\S\ref{sec:examples}). We classify where functional values may remain in a resultant program (\S\ref{sec:completeness}) and show how to modify our method to guarantee termination (\S\ref{sec:termination}). Finally we give results (\S\ref{sec:results}), review related work (\S\ref{sec:related}) and conclude (\S\ref{sec:conclusion}).
 
-\section{Our Core Language}
+\section{Core Language}
 \label{sec:core}
 
 \begin{figure}
 \ignore\begin{code}
-func = f vs_ expr
+prog   =  [func]           {-"\text{\hspace{1cm}program definition}"-}
 
-expr  =  Lambda vs_ x    -- lambda abstraction
-      |  Fun f xs_       -- function application
-      |  Con c xs_       -- constructor application
-      |  App x xs_       -- general application
-      |  Var v           -- variable
-      |  Case x alts_    -- case expression
-      |  Let v x y       -- let expression
+func   =  f vs_ expr       {-"\text{\hspace{1cm}function definition}"-}
 
-alt = c vs_ -> x
+expr   =  Lambda vs_ x     {-"\text{\hspace{1cm}lambda abstraction}"-}
+       |  Fun f xs_        {-"\text{\hspace{1cm}function application}"-}
+       |  Con c xs_        {-"\text{\hspace{1cm}constructor application}"-}
+       |  App x xs_        {-"\text{\hspace{1cm}general application}"-}
+       |  Var v            {-"\text{\hspace{1cm}variable}"-}
+       |  Let v x y        {-"\text{\hspace{1cm}let expression}"-}
+       |  Case x alts_     {-"\text{\hspace{1cm}case expression}"-}
+
+alt    =  c vs_ -> x       {-"\text{\hspace{1cm}case alternative}"-}
 \end{code}
 \begin{comment}
 % for paper haskell
@@ -171,18 +178,19 @@ We let |v| range over variables, |x| over expressions, |f| over function names a
 \label{fig:core}
 \end{figure}
 
-Our Core language is presented in Figure \ref{fig:core} -- and has a number of differences from a standard Core language. A function in our Core language consists of a name, a list of arguments, and a body expression. The arity of a function is the number of arguments associated with it.
+Our Core language is presented in Figure \ref{fig:core}. A program is a set of functions, with a root function named |main|. A function definition consists of a name, a list of argument variables, and a body expression. The arity of a function is the number of arguments in its definition. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}.
 
-The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor -- any constructors not given enough arguments can be wrapped within a lambda expression. The function expression consists of a function and a list of argument expressions -- a number which may be less, equal to, or more than the arity of the function. If a function is given too few arguments, we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied} and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented as a lambda expression.) A named application consists of a function name and a list of argument expressions -- a number which may be less, equal to, or more than the arity of the function. If a function is given too few arguments, we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied} and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
 
-A program can be said to be higher-order if at runtime the program generates and manipulates functional values. Functional values can only be created in two ways: (1) a lambda expression; (2) a partially-applied function application. We make the following definition:
+Informally, a program is higher-order if at runtime the program generates and manipulates functional values. As functional values can only be created in two ways; (1) a lambda expression and (2) a partially-applied function application, we make the following definition:
 
-\paragraph{Definition: First-Order} A program which contains no lambda expressions and no partially-applied functions is first-order.
+\paragraph{Definition: First-Order} A program which contains no lambda expressions and no partially-applied functions is first-order.\noexample
 
-In Example \ref{ex:incList}, our program is higher-order because of the under-saturation of both |map| and |(+)|. In the defunctionalized version, the program is first-order.
+\begin{examplerevisit}{\ref{ex:incList}}
+The original program is higher-order because of the under-saturation of both |map| and |(+)|. In the defunctionalised version, the program is first-order.
+\end{examplerevisit}
 
-We do not permit primitives in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We assume a root function, named |main|. We assume that if |main| takes any arguments, they are all first-order values, and that |main| evaluates to a first-order value. Again, we will explain how to loosen these restrictions in Example \ref{ex:root_function_functional}.
-
+\todo{Clarify use vs creation of functional values} In general, we want to assume that general application is first-order, even though the first argument must be a functional value. Refer to this later in the results.
 
 \section{Our First-Order Reduction Method}
 \label{sec:overview}
@@ -198,6 +206,8 @@ Our method works by combining three separate and well-known transformations. Add
 Each transformation has the possibility of removing some functional values, but the key contribution of this paper is \textit{how they can be used together}. Each transformation on its own is correctness preserving, and none introduce any additional data types. Each can also be implemented upon a typed Core language, although we have not done so.
 
 We proceed by first giving a brief flavour of how each operation can be used to remove some functional values. We then discuss each step in detail in \S\ref{sec:detailed}, including how they can be combined. We leave the issue of termination until \S\ref{sec:termination}.
+
+\todo{If possible, come up with a running example -- hard to find one which hits them all and isn't too complex.}
 
 \subsection{Simplification}
 
@@ -252,6 +262,9 @@ even x = not (odd x)
 
 
 \subsection{Inlining}
+
+Their use is ubiquitous -- even a simple numeric literal in Haskell typically expands into the application of a function taking a tuple containing many functional values. This operation occurs as part of the dictionary transformation for the implementation of type classes \cite{wadler:type_classes}.
+
 
 We use inlining to remove functions which return data constructors containing functional values.
 
@@ -320,7 +333,7 @@ We cannot both remove all functional values and meet this goal. We choose to not
 
 \paragraph{Preserve the space/sharing behaviour of the program.} In the expression |let y = f x in y + y|, according to the rules of lazy evaluation, |f x| will be evaluated at most once. We could inline the let binding to give |f x + f x|, but this expression evaluates |f x| twice. Where possible, we will avoid changing the sharing of the program. Our goals are primarily for analysis of the resultant code, not to compile and execute the result. Because we are not interested in performance, we permit the loss of sharing in computations, if to do so will remove functional values.
 
-\paragraph{Other Desirable Qualities.} Previous defunctionalization attempts have shown a concern about code size increase \cite{chin:higher_order_removal}. A smaller resultant program would be desirable, but not at the cost of clarity. The speed of the implementation is not of much importance to us, provided it performs in a respectable time to permit proper evaluation.
+\paragraph{Other Desirable Qualities.} Previous defunctionalisation attempts have shown a concern about code size increase \cite{chin:higher_order_removal}. A smaller resultant program would be desirable, but not at the cost of clarity. The speed of the implementation is not of much importance to us, provided it performs in a respectable time to permit proper evaluation.
 
 
 \section{Method in Detail}
@@ -796,7 +809,7 @@ snoc x xs = \ys -> xs (x:ys)
 list xs = xs []
 \end{code}
 
-This list representation provides |nil| similarly to |[]| in standard lists, but instead of providing a |(:)| or ``cons'' operation, it provides |snoc| which adds a single element on to the end of the list. The function |list| is provided to create a standard list. We are unable to defunctionalize such a construction, as it stores unbounded information within closures. We have seen such constructions in both the |lines| function of the HsColour program, and the |sort| function of Yhc.
+This list representation provides |nil| similarly to |[]| in standard lists, but instead of providing a |(:)| or ``cons'' operation, it provides |snoc| which adds a single element on to the end of the list. The function |list| is provided to create a standard list. We are unable to defunctionalise such a construction, as it stores unbounded information within closures. We have seen such constructions in both the |lines| function of the HsColour program, and the |sort| function of Yhc.
 
 However, there is an alternative implementation of these functions:
 
@@ -1038,7 +1051,7 @@ One of the conditions for termination of homeomorphic embedding is that there is
 
 Using homeomorphic embedding on the previous example, we would generate the specialised variant of |f (Value head)|. Upon attempting to generate the specialised variant |f (Wrap (Value head))| we would abort, with an embedding.
 
-While homeomorphic embedding is sufficient to obtain defunctionalization in most simple examples, there do exist examples where it terminates prematurely.
+While homeomorphic embedding is sufficient to obtain defunctionalisation in most simple examples, there do exist examples where it terminates prematurely.
 
 \begin{example}
 \begin{code}
@@ -1078,7 +1091,7 @@ We have shown that arity raising, inlining and specialisation are finite. The re
 \label{sec:results}
 
 \begin{table}
-\caption{Results of defunctionalization on the nofib suite.}
+\caption{Results of defunctionalisation on the nofib suite.}
 \label{tab:results}
 
 \smallskip
@@ -1118,7 +1131,7 @@ Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & -33\% \\
 
 We have tested out method with programs drawn from the nofib benchmark \cite{nofib}, and the results are given in Table \ref{tab:results}. We have tested with all 14 tests from the imaginary section (each shown in the table), and 35 out of the 47 tests in the spectral section. The remaining 12 tests in the spectral section do not compile using the Yhc compiler, mainly due to missing or incomplete libraries.
 
-Most analysis operations work on an abstracted view of the program. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of defunctionalization, we have worked on unmodified Yhc libraries, including all the low-level detail. Higher-order functions occur in many places, including:
+Most analysis operations work on an abstracted view of the program. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations -- while an analysis tool would probably give an abstraction for the |readFile| function. For the purposes of defunctionalisation, we have worked on unmodified Yhc libraries, including all the low-level detail. Higher-order functions occur in many places, including:
 
 \begin{itemize}
 \item Type classes create dictionaries which are implemented as tuples of functions.
@@ -1171,7 +1184,7 @@ Given this, we would replace all invocations of |f| with |g|. The reason for the
 \section{Related Work}
 \label{sec:related}
 
-Reynolds style defunctionalization \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
+Reynolds style defunctionalisation \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
 
 \begin{example}
 \begin{code}
@@ -1196,9 +1209,9 @@ map f x = case  x of
 \noindent Now all calls to |map head| are replaced by \ignore|map Head|.
 \end{example}
 
-Reynold's method works on all programs, defunctionalized code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
+Reynold's method works on all programs, defunctionalised code is still type safe, but type checking would require a dependently typed language. Since the original work, people have proposed variants of Reynold's method that are type safe in the simply typed lambda calculus \cite{bell:type_driven_defunctionalization}, and within a polymorphic type system \cite{pottier:polymorhpic_typed_defunctionaization}.
 
-We are unaware of any simple method for extending Reynold's style defunctionalization to primitives, without changes the primitives to be aware of the \ignore|Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
+We are unaware of any simple method for extending Reynold's style defunctionalisation to primitives, without changes the primitives to be aware of the \ignore|Function| data type. The method is complete, removing all possible higher-order functions, and preserves space behaviour. The disadvantage is that the transformation essentially embeds a mini-interpreter for the original program into the new program. The flow control is complicated by the extra level of indirection.
 
 Reynold's method has been used as a tool in program calculation \cite{danvy:defunctionalization_at_work,hutton:calculating_an_exceptional_machine}, often as a mechanism for removing introduced continuations. Another use of Reynold's method is for optimisation \cite{grin,jhc}, allowing flow control information to be recovered without the complexity of higher-order transformation.
 
