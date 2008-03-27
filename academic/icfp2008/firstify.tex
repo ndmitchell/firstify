@@ -22,13 +22,16 @@
 %format let_ = "\mathsf{let}"
 %format case_ = "\mathsf{case}"
 
-%format Lambda a b = \a -> b
-%format Fun a b = a \? b
-%format Con a b = a \? b
-%format App a b = a \? b
-%format Var a = a
-%format Case a b = case a of b
-%format Let a b c = let a = b in c
+%format (Lambda a (b)) = "\ll{}" \a -> b "\rr{}"
+%format (Fun a b) = "\ll{}" a \? b "\rr{}"
+%format (Con a b) = "\ll{}" a \? b "\rr{}"
+%format (App a b) = "\ll{}" a \? b "\rr{}"
+%format (Var a) = "\ll{}" a "\rr{}"
+%format (Case a b) = "\ll{}\!\!" case a of b "\rr{}"
+%format (Let a b c) = "\ll{}\!\!" let a = b in c "\rr{}"
+
+\renewcommand{\ll}{[\![}
+\newcommand{\rr}{]\!]}
 
 \newcommand{\simp}[2]{\vspace{-7mm} #2 & (#1) \\}
 \newenvironment{simplify}
@@ -388,13 +391,13 @@ The expression |f +||+ g| applies |f| to an input until it reaches a fixed point
 \item[Joint fixpoint] After the operation has completed, applying either |f| or |g| does not change the value.
 
 \begin{code}
-propJointFixpoint f g x = let r = (+|+) f g x in (f r == r) && (g r == r)
+propFix f g x = let r = (+|+) f g x in (f r == r) && (g r == r)
 \end{code}
 
-\item[Overall fixpoint] The operation as a whole achieves a fixpoint. \todo{Is this not saying that |f +||+ g| is idempotent?}
+\item[Overall idempotence] The operation as a whole achieves is idempotent.
 
 \begin{code}
-propOverallFixpoint f g x = let op = f +|+ g in op (op x) == op x
+propIdempotent f g x = let op = f +|+ g in op (op x) == op x
 \end{code}
 
 \item[Function ordering] The function |f| reaches a fixed point before the function |g| is applied. If a postcondition of |f| implies a precondition of |g|, then we can guarantee |g|'s precondition is always met.
@@ -599,7 +602,7 @@ isLambda _               = False
 \end{figure}
 
 \begin{definition}
-An expression |e| is a boxed lambda if |isBox e == True|, where |isBox| is defined as in Figure \label{fig:boxed_lambda}.
+An expression |e| is a boxed lambda if |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}.
 \end{definition}
 
 The |isBox| as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not change the result of any previously terminating evaluations.
@@ -644,9 +647,9 @@ For each application of a function to arguments containing lambdas, a specialise
 The specialisation transformation makes use of \textit{templates}. A template is an expression where some sub-expressions are omitted, denoted by an underscore. The process of specialisation proceeds as follows:
 
 \begin{enumerate}
-\item Find all functions which have functional arguments, and generate templates, omitting first-order components.
-\item For each template, generate an associated function, specialised to the template.
-\item For each subexpression matching a template, replace it with the generated function.
+\item Find all functions which have arguments containing lambdas, and generate templates, omitting first-order components (see \S\ref{sec:generate_templates}).
+\item For each template, generate a function specialised to that template (see \S\ref{sec:generate_functions}).
+\item For each subexpression matching a template, replace it with the generated function (see \S\ref{sec:use_templates}).
 \end{enumerate}
 
 \begin{example}
@@ -658,9 +661,10 @@ map f xs = case  xs of
                  y:ys  -> f y : map f ys
 \end{code}
 
-The specialisation first finds the application of |map| within |main|, and generates the template \ignore|map (\x -> x) _| -- omitting the |xs| which is not obviously a functional value. It then generates the name |map_id| for the template, and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including in the call to |map| within the freshly generated |map_id|.
+Specialisation first finds the application of |map| in |main|, and generates the template \ignore|map (\x -> x) _| -- omitting the |xs| which is not obviously a functional value. It then generates a unique name for the template (we choose |map_id|), and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including in the call to |map| within the freshly generated |map_id|.
 
 \begin{code}
+\label{ex:map_id}
 main xs = map_id xs
 
 map_id xs = case  xs of
@@ -668,49 +672,86 @@ map_id xs = case  xs of
                   y:ys  -> y : map_id ys
 \end{code}
 
-The resulting code has no functional values within it.
+The resulting code is first-order.
 \end{example}
 
+\todo{Not clear here}
 The specialisation stage is the only one which introduces new function names. In order to recover an expression in the input language, it is sufficient to replace all generated functions with their associated template, supplying all necessary variables.
 
 \subsubsection{Generating Templates}
+\label{sec:generate_templates}
 
-A template is generated if an expression is an application to a top-level function, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda. The template includes all sub-expressions whose removal would lead to higher-order elements, or which have free variables from a bound variable.
+%format underscore = _
+
+\begin{figure}
+\begin{comment}
+\begin{code}
+underscore = undefined :: Expr
+\end{code}
+\end{comment}
+\begin{code}
+template :: Expr -> Expr
+template (Fun f xs_)  = map (t []) xs_ & Fun f
+template _            = underscore
+
+t :: [String] -> Expr -> Expr
+t seen y =  let t' = t seen in case y of
+    Lambda vs_ x  ->  Lambda vs_ (t (vs_++seen) x)
+    Fun f xs_     |   isBox y -> Fun f (map t' xs_)
+    Var v         ->  if v `elem` seen then Var v else underscore
+    Fun f xs_     ->  map t' xs_ & Fun f
+    Con c xs_     ->  map t' xs_ & Con c
+    App x xs_     ->  map t' (x:xs_) & \(x:xs_) -> App x xs_
+    Let v x y     ->  [x,y] &
+                      \[x,_] -> Let v x (t (v:seen) y)
+    Case x alts_  ->  (t' x : map (t' . rhs) alts_) &
+                      \(x:_) -> Case x (map g alts_)
+        where g (Alt c vs_ x) = Alt c vs_ (f (vs_++seen) x)
+
+(&) :: [Expr] -> ([Expr] -> Expr) -> Expr
+(&) xs f = if all (== underscore) xs then underscore else f xs
+\end{code}
+\caption{Template generation function.}
+\label{fig:template_generation}
+\end{figure}
+
+A template is generated if an expression is an application of a top-level function, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda -- as calculated by the |template| function in Figure \ref{fig:template_generation}. The template additionally includes all sub-expressions whose removal would lead to functional values in |underscore| positions, and all free variables bound within the template.
 
 \begin{example}
-\ignore\begin{code}
-id (\x -> x)             => id (\x -> x)
-id (Just (\x -> x))      => id (Just(\x -> x))
-id (Just (\x -> x + 3))  => id (Just (\x -> x + _))
-id (Just (\x -> x + y))  => id (Just (\x -> x + _))
-\end{code}
+\noindent\begin{tabular}{ll}
+Expression & Template \\
+|id (\x -> x)|                & |id (\x -> x)| \\
+|id (Just (\x -> x))|         & |id (Just (\x -> x))| \\
+|id (\x -> let y = 12 in 4)|  & |id (\x -> underscore)| \\
+|id (\x -> let y = 12 in x)|  & |id (\x -> let y = underscore in x)| \\
+\end{tabular}
 
-In all examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, the |3| and |y| are not dependent on variables bound within the lambda, and are left as unspecified.  The |Just| and |+| functions are also not dependent on the bound variables, however their removal would require a functional argument as a parameter, so are left as part of the template.
+In all examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, there are subexpressions which do not depend on variables bound within the lambda -- these have been removed. The |Just| and |+| functions are also not dependent on the bound variables, however their removal would require a functional argument as a parameter, so are left as part of the template.
 \end{example}
 
 \subsubsection{Generating Functions}
+\label{sec:generate_functions}
 
-Given a template, to generate an associated function, a unique function name is allocated to the template. Each |_| within the template is assigned a free variable, as an argument to the new function, then the body is produced by unfolding the outer function symbol in the template once.
+Given a template, to generate an associated function, a unique function name is allocated to the template. For each |_| template a fresh argument free variable is assigned. The body is produced by unfolding the outer function symbol in the template once.
 
-\begin{example}
-\label{ex:map_id}
-Following the \ignore|map (\x -> x) _| template from above, we can generate |v_1| as the unique free variable for the single |_| placeholder, and |map_id| as the function name:
+\begin{examplerevisit}{\ref{ex:map_id}}
+Consider the \ignore|map (\x -> x) _|. Let |v_1| be the fresh argument variable for the single |_| placeholder, and |map_id| be the function name:
 
 \begin{code}
 map_id v_1 = map (\x -> x) v_1
 \end{code}
 
-In the next step, we unfold the definition of map once:
+\noindent We unfold the definition of |map| once:
 
 \begin{code}
-map_id v_1 = let  f   = \x -> x
-                  xs  = v_1
-             in   case  xs of
-                        []    -> []
-                        y:ys  -> f y : map f ys
+map_id v_1 =  let  f   = \x -> x
+                   xs  = v_1
+              in   case  xs of
+                         []    -> []
+                         y:ys  -> f y : map f ys
 \end{code}
 
-Now the generation of the specialised variant is complete. To give an idea of how the final function is calculated, after the simplification rules from Figure \ref{fig:lambda_simplify}, we end up with:
+\noindent After the simplification rules from Figure \ref{fig:lambda_simplify}, we obtain:
 
 \begin{code}
 map_id v_1 =  let  xs = v_1
@@ -718,12 +759,14 @@ map_id v_1 =  let  xs = v_1
                          []    -> []
                          y:ys  -> y : map (\x -> x) ys
 \end{code}
-\end{example}
+\end{examplerevisit}
 
 \subsubsection{Using Templates}
+\label{sec:use_templates}
 
-After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to an undecided element is passed as an argument. Continuing with the generated code from Example \ref{ex:map_id}, we end up with:
+After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to an |underscore| is passed as an argument.
 
+\begin{exampleany}{\ref{ex:map_id} (continued)}
 \begin{code}
 map_id v_1 =  let  xs = v_1
               in   case  xs of
@@ -731,12 +774,18 @@ map_id v_1 =  let  xs = v_1
                          y:ys  -> y : map_id ys
 \end{code}
 
-We have now eliminated all the functional values from within this operation.
+We now have a first-order definition.
+\end{exampleany}
 
 \subsection{Extending the method to allow primitive functions}
 \label{sec:primitives}
 
-Primitive functions are like normal functions, but do not have an associated body, and therefore cannot be examined or inlined. We can make two simple changes to support primitives. Firstly, we define that a primitive application is not a boxed lambda. Secondly, we restrict specialisation so that if a function to be specialised is actually a primitive, no template is generated. The reason for this restriction is that the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
+Primitive functions are like normal functions, but do not have an associated body, and therefore cannot be examined or inlined. We make two just simple changes to support primitives.
+
+\begin{enumerate}
+\item We define that a primitive application is \textit{not} a boxed lambda.
+\item We restrict specialisation so that if a function to be specialised is actually a primitive, no template is generated. The reason for this restriction is that the generation of code associated with a template requires a one-step unfolding of the function, something which cannot occur with a primitive.
+\end{enumerate}
 
 \section{Examples}
 \label{sec:examples}
