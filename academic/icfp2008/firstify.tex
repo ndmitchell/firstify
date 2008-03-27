@@ -193,7 +193,7 @@ A program which contains no lambda expressions and no partially-applied function
 The original program is higher-order because of the under-saturation of both |map| and |(+)|. In the defunctionalised version, the program is first-order.
 \end{examplerevisit}
 
-\todo{Clarify use vs creation of functional values} In general, we want to assume that general application is first-order, even though the first argument must be a functional value. Refer to this later in the results.
+Note that a program may have general application, yet still be first-order according to this definition. General application makes use of a functional value, so will usually be accompanied by the creation of a functional value elsewhere within the program.
 
 \section{Our First-Order Reduction Method}
 \label{sec:overview}
@@ -213,8 +213,6 @@ firstify = simplify +|+ arity +|+ inline +|+ specialise
 \end{code}
 
 We proceed by first giving a brief flavour of how these transformations used in isolation may remove some functional values. We then discuss them in detail in \S\ref{sec:detailed}, including how they can be combined.
-
-\todo{If possible, come up with a running example -- hard to find one which hits them all and isn't too complex.}
 
 \subsection{Simplification}
 
@@ -511,7 +509,7 @@ let v = x in \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
-The simplification stage has the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. \todo{Confluence?}
+The simplification stage has the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. This stage makes use of standard simplification rules given in Figure \ref{fig:simplify}, which are found in most simplifiers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches.
 
 \subsubsection{ELam Introduction}
 
@@ -669,8 +667,7 @@ map_id xs = case  xs of
 The resulting code is first-order.
 \end{example}
 
-\todo{Not clear here}
-The specialisation stage is the only one which introduces new function names. In order to recover an expression in the input language, it is sufficient to replace all generated functions with their associated template, supplying all necessary variables.
+Specialisation is the only stages which introduces new function names. In order to translate an expression in the result program to an equivalent expression in the input program, it is sufficient to replace all generated function names with their associated template, supplying all the necessary variables.
 
 \subsubsection{Generating Templates}
 \label{sec:generate_templates}
@@ -878,55 +875,28 @@ We are able to show that if the residual program contains a lambda, it will occu
 \begin{enumerate}
 \item The termination criteria stopped further defunctionalisation (see \S\ref{sec:termination}).
 \item The main function either takes a functional argument, or returns a functional value.
-\item A primitive function is passed a functional argument, or returns one.
+\item A primitive function is passed a functional argument, or returns a functional value.
 \item The lambda is the body of a lambda expression.
-\item The lambda is the argument to a general application.
+\item The lambda is the argument to a general application, applied to a variable.
 \end{enumerate}
 
-\todo{Refine this bit, state what the result is, then give examples.}
+For the remainder of this section, we assume the first three situations do not occur. If this is the case, then all lambda expressions must exist in an expression of a similar form to |v (\x -> y)|, where |y| is potentially a lambda, or |v z| where |z| is a boxed lambda. Any lambda as an argument to an application cannot be bound to a variable. Therefore, |v| must not be bound to a lambda. This leaves two possibilities: (1) either |v| is bound to $\bot{}$; or (2) |v| is never bound to anything. For example:
 
-Assuming the first three do not happen, then there must exist an expression such as |v (\x -> x)|.
-
-\begin{examplename}{Dead Code}
-\begin{code}
-nothing = Nothing
-
-main = case  nothing of
-             Nothing  -> 1
-             Just f   -> f (\x -> x)
-\end{code}
-
-In |main| the |Nothing| branch will always be taken. The |Just| branch would create a functional value if taken, but as it will never be taken, this program will never create a functional value. Our method cannot remove this lambda.
-\end{examplename}
-
-\begin{examplename}{Undefined Values}
-\label{ex:undefined_values}
 \begin{code}
 bottom = bottom
+main_1 = bottom (\y -> y)
 
-main = bottom (\y -> y)
+nothing = Nothing
+main_2 = case  nothing of
+               Nothing  -> 1
+               Just f   -> f (\x -> x)
 \end{code}
 
-In |main| a lambda is applied to |undefined|, so the program will non-terminate before the lambda is evaluated. The |bottom| function could also have been implemented as a call to the |error| primitive, with similar results.
-\end{examplename}
-
-Therefore the root function may be a boxed lambda, with a lambda inside the box. Or a lambda or boxed lambda may occur as inside a lambda, or as the second argument to an application. Given this situation, we can be sure that the variable does not bind to a lambda, as the lambda cannot escape. This leads us to the following situations:
-
-\ignore\begin{code}
-case v of
-    Just w -> w (\x -> x)
-    Nothing -> 1
-
-bottom (\x -> x)
-    where bottom = bottom
-\end{code}
-
-In the first case there must be no corresponding |Just| value containing a functional value, so the first branch must be dead code. In the second example, a non-terminating function the first argument of an application, and contains a lambda as an argument to it. Provided the |main| function is first-order, and the termination criteria have not applied, if a program has any residual lambda expressions, there must be at least one in one of these two situations.
-
+All residual lambda expressions within the resultant program will be one of these forms, assuming the three restrictions outlined above.
 
 \subsection{Notation}
 
-To examine where lambda expressions may occur, we model our Core language as a set of \textit{syntax trees}. We define the following rules, which generate possible expressions:
+To examine where lambda expressions may occur, we model our Core language as a set of \textit{syntax trees}. We define the following rules, which generate sets of expressions:
 
 \ignore\begin{code}
 lam x     = {\v' -> x' | v' `elem` v, x' `elem` x}
@@ -936,13 +906,9 @@ app x y   = {x' ys_' | x' `elem` x, ys_' `elem_` y}
 var       = {v' | v' `elem` v}
 let x y   = {let v' = x' in y' | x' `elem` x, y' `elem` y}
 case x y  = {case x' of alts' | alts' `elem_` ({-"\text{\todo{not sure here}}"-})}
-
-where v = variables
-      f = function names
-      c = constructors
 \end{code}
 
-These rules have abstracted away variable names and patterns in expressions such as case, let and lambda. In the case of |fun x y|, |x| represents the possible expressions of the body of the function, while |y| represents the arguments -- the function name is not represented. We use |`elem_` e| to be sequences of any length containing elements drawn from |e|. We can now represent our Core language as the smallest solution to the equation |s|:
+Where |v| is the set of all variables, |f| the set of function names, and |c| the set of constructors. In the case of |fun x y|, |x| represents the possible expressions of the body of the function, while |y| represents the arguments. We use |`elem_` e| to be sequences of any length containing elements drawn from |e|. We can now represent our Core language as the smallest solution to the equation |s|:
 
 % _ = L f C a v c l
 \ignore\begin{code}
@@ -957,7 +923,7 @@ We initially know that any resultant program must be in the form defined by |s|.
 % _ = L f C a(!C, _) v c(!L, _) l
 \ignore\begin{code}
 s  =  lam s &+ fun s s_ &+ con s &+ app (s - con s) s &+ var &+
-       case_ (s - lam s) s_ &+ let_ s s
+      case_ (s - lam s) s_ &+ let_ s s
 \end{code}
 
 Our simplification rules given in Figure \ref{fig:simplify} are applied until a fixed point is found, meaning that the left-hand side of any rule cannot occur in the output. Accounting for these restrictions we are left with:
@@ -965,7 +931,7 @@ Our simplification rules given in Figure \ref{fig:simplify} are applied until a 
 % _ = L f C a(v, _) v c(f a v, _) l
 \ignore\begin{code}
 s  =  lam s &+ fun s s &+ con s &+ app var s &+ var &+
-       case_ (fun s s &+ app var s &+ var) s &+ let_ s s
+      case_ (fun s s &+ app var s &+ var) s &+ let_ s s
 \end{code}
 
 Next we apply the lambda rules from Figure \ref{fig:lambda_simplify}. As \ignore|(s - lam s)| occurs repeatedly we have factored it out as |l'|.
@@ -1000,7 +966,7 @@ Now |(e - b')| is the set of lambda boxes. We use the inlining and the (bind-box
 s   = l'
 l' = e - lam e
 e =  lam e &+ fun l' e &+ con e &+ app var e &+ var &+
-      case_ (fun (l' &* b') e &+ app var e &+ var) l' &+ let_ (l' &* b') l'
+     case_ (fun (l' &* b') e &+ app var e &+ var) l' &+ let_ (l' &* b') l'
 \end{code}
 
 Now we can make use of the specialise rule, which removes all lambdas and boxed lambdas from the arguments of function applications:
@@ -1009,29 +975,29 @@ Now we can make use of the specialise rule, which removes all lambdas and boxed 
 s   = l'
 l' = e - lam e
 e =  lam e &+ fun l' (l' &* b') &+ con e &+ app var e &+ var &+
-      case_ (fun (l' &* b') (l' &* b') &+ app var e &+ var) l' &+
-      let_ (l' &* b') l'
+     case_ (fun (l' &* b') (l' &* b') &+ app var e &+ var) l' &+
+     let_ (l' &* b') l'
 \end{code}
 
 Having applied all the rules, we now classify what the parent expressions of a lambda may be. A lambda may not be the root of a function body, because |lam| is not a production in |s|. If we restrict our attention only to expressions which permit a lambda expression as a direct child, and add explicit \ignore|lam e| productions where we can, we are left with:
 
 \ignore\begin{code}
 e =  lam (lam e &+ e) &+ con (lam e &+ e) &+ app var (lam e &+ e)
-      -- productions not permitting a lambda as a direct child
 \end{code}
 
-A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a lambda box, and therefore is not permitted anywhere |b'| is intersected with the expression. We can now classify where a lambda box may occur, denoting all expressions as either |_b| to denote that a box may occur, or |b'| to denote that it may not:
+A lambda may therefore occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a boxed lambda, and therefore is not permitted anywhere |b'| is intersected with the expression. We can now classify where a boxed lambda may occur, denoting all expressions as either |_b| to denote that a box may occur, or |b'| to denote that it may not:
 
 \ignore\begin{code}
-lam _b &+ fun _b b' &+ con _b &+ app b' _b &+ case_ b' _b &+ let_ b' _b
+lam b &+ fun b b' &+ con b &+ app b' b &+ case_ b' b &+ let_ b' b
 \end{code}
 
-\todo{Not clear here}
-Therefore only a function body can be a a constructor containing a lambda may only occur at the root of a function (since |s| permits boxed lambdas), or in one of the positions outlined above. Assuming no unreachable functions, either the root function of the program must evaluate to a boxed lambda, or there must be an expression which is not an unboxed lambda containing a boxed lambda. Of the above productions, most are boxed lambdas by definition, so the only non-boxed lambdas containing a boxed lambda are:
+If the body of a function is a boxed lambda, then any named application of the function is a boxed lambda. Therefore, either the body of the |main| function is a boxed lambda, or any applied function whose body is a boxed lambda is in one of the |b| positions shown. Of the productions above, only |lam| and |app| are not boxed lambdas. A boxed lambda must either be at the root of a program, or must be contained within an expression which is not a boxed lambda. Therefore, if we exclude expressions which are themselves boxed lambdas:
 
 \ignore\begin{code}
-lam _b &+ app b' _b
+lam b &+ app b' b
 \end{code}
+
+We have now shown that a lambda or boxed lambda may only occur as the body of a lambda, or applied in a generalised application to a variable. Additionally, the body of the |main| function may be a boxed lambda, meaning the |main| function returns a functional value.
 
 \section{Proof of Termination}
 \label{sec:termination}
@@ -1157,10 +1123,7 @@ By default our defunctionalisation program uses 8 sets. In the results table giv
 
 \subsection{Termination as a Whole}
 
-\todo{Not very convincing}
-We call a function |f| finite if it only applies a finite number of times, given a starting program. We call a function |f| terminating if |fix f| terminates. Given |f +||+ g|, if both |f| and |g| are finite then |f +||+ g| is finite. If one if finite, and the other is terminating, then the entire production is terminating.
-
-We have shown that arity raising, inlining and specialisation are finite. The remaining step, simplification, is terminating. Therefore our entire program is terminating.
+Given an initial program, the arity raising, inlining and specialisation stages will each apply a finite number of times. The simplification stage is terminating on its own, and will be invoked a finite number of times, so will also terminate. Therefore, when combined, the stages will terminate.
 
 \section{Results}
 \label{sec:results}
