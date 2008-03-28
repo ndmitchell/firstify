@@ -13,10 +13,11 @@ import System.IO
 import Yhc.Core
 import Yhc.Core.Firstify
 import Yhc.Core.Firstify.MitchellOld
+import Yhc.Core.Firstify.MitchellFast
 import qualified Data.Map as Map
 
 
-data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Normalise
+data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | MitchellFast | Normalise
              | Output String | MainIs CoreFuncName | OutCore | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
@@ -24,6 +25,7 @@ data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Normal
 opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
+    ,Option "f" ["fast"]     (NoArg MitchellFast) "Perform Mitchell defunctionalisation (fast)"
     ,Option "s" ["super"]    (NoArg Super)    "Perform Super defunctionalisation"
     ,Option "M" []           (NoArg MitchellOld) "Debugging option (to be removed)"
     ,Option "i" ["info"]     (NoArg Stats   ) "Show additional statistics"
@@ -75,9 +77,11 @@ main = do
             return c
     stats c
 
-    c <- if Mitchell `notElem` acts then return c else do
+    c <- if Mitchell `notElem` acts && MitchellFast `notElem` acts then return c else do
         putStrLn "Performing Mitchell firstification"
-        stats $ (if MitchellOld `elem` acts then mitchellOld else mitchell) c
+        stats $ (if MitchellOld `elem` acts then mitchellOld
+                 else if MitchellFast `elem` acts then mitchellFast
+                 else mitchell) c
 
     c <- if Super `notElem` acts then return c else do
         putStrLn "Performing Super firstification"
