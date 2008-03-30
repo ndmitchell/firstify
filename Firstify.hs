@@ -12,11 +12,12 @@ import System.FilePath
 import System.IO
 import Yhc.Core
 import Yhc.Core.Firstify
+import Yhc.Core.Firstify.Paper
 import Yhc.Core.Firstify.MitchellOld
 import qualified Data.Map as Map
 
 
-data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Normalise
+data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Paper | Normalise
              | Output String | MainIs CoreFuncName | OutCore | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
@@ -25,6 +26,7 @@ opts =
     [Option "r" ["reynolds"] (NoArg Reynolds) "Perform Reynolds defunctionalisation"
     ,Option "m" ["mitchell"] (NoArg Mitchell) "Perform Mitchell defunctionalisation"
     ,Option "s" ["super"]    (NoArg Super)    "Perform Super defunctionalisation"
+    ,Option "p" ["paper"]    (NoArg Paper)    "Perform paper style defunctionalisation"
     ,Option "M" []           (NoArg MitchellOld) "Debugging option (to be removed)"
     ,Option "i" ["info"]     (NoArg Stats   ) "Show additional statistics"
     ,Option "v" ["verbose"]  (NoArg Verbose ) "Give verbose statistics"
@@ -79,6 +81,10 @@ main = do
         putStrLn "Performing Mitchell firstification"
         stats $ (if MitchellOld `elem` acts then mitchellOld else mitchell) c
 
+    c <- if Paper `notElem` acts then return c else do
+        putStrLn "Performing Paper firstification"
+        stats $ paper c
+
     c <- if Super `notElem` acts then return c else do
         putStrLn "Performing Super firstification"
         stats $ super c
@@ -88,7 +94,7 @@ main = do
         stats $ reynolds c
 
     let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts] ++
-              ['s' | Super `elem` acts]
+              ['s' | Super `elem` acts] ++ ['p' | Paper `elem` acts]
     out <- case [o | Output o <- acts] of
                o:_ -> return o
                _ -> findOutput (if null ext then "none" else ext) $ head files
