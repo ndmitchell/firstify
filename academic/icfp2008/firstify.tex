@@ -584,10 +584,10 @@ isBox (ECon c xs_     )  =  any isLambda xs_ ||  any isBox xs_
 isBox (ELet v x y     )  =  isBox y
 isBox (ECase x alts_  )  =  any (isBox . rhs) alts_
 isBox (EFun f xs_     )  =  isBox (body f)
-isBox _                 =  False
+isBox _                  =  False
 
 isLambda (ELam v x)  = True
-isLambda _               = False
+isLambda _           = False
 \end{code}
 \caption{The |isBox| function, to test if an expression is a boxed lambda.}
 \label{fig:boxed_lambda}
