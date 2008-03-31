@@ -75,7 +75,7 @@ run :: CoreFuncMap -> SS CoreFuncMap
 run precore = do
     let cr = Map.map (applyBodyFunc wrapCoreFun) precore
         orde = order cr
-    modify $ \s -> s{info = Info (boxApprox cr orde) (Map.map coreFuncArity cr) Map.empty []
+    modify $ \s -> s{info = Info Set.empty (Map.map coreFuncArity cr) Map.empty []
                     ,core = cr}
     step False orde
 
@@ -162,13 +162,6 @@ order core = reverse $ f ["main"] Set.empty
 
         f (t:odo) done = f odo done
         f [] done = []
-
-
--- make an approximation of which functions are boxes at the start
--- also use the initial ordering, to give you a hand
-boxApprox :: CoreFuncMap -> [CoreFuncName] -> Set.Set CoreFuncName
-boxApprox _ _ = Set.empty
-
 
 
 wrapCoreFun (CoreFun x) = CoreApp (CoreFun x) []
