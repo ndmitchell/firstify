@@ -20,6 +20,11 @@ eq x = x == (0::Int)
 main2 x y = neq2 (x::Int) y
 neq2 x y = not (x == y)
 
+main2_5 = case id f2_5 of
+               Just x -> x 1
+               Nothing -> 1
+f2_5 = Just id
+
 
 main3 xs = (a . b . c) xs
 a x = x+(1::Int)
