@@ -151,7 +151,17 @@ step False [] = do
 -- should be main last, all its dependencies before
 -- but skip anything unreachable
 order :: CoreFuncMap -> [CoreFuncName]
-order core = [name | CoreFunc name _ _ <- Map.elems core]
+order core = reverse $ f ["main"] Set.empty
+    where
+        f (t:odo) done
+                | isCoreFunc fun && not (t `Set.member` done)
+                = t : f (calls++odo) (Set.insert t done)
+            where
+                calls = [x | CoreFun x <- universe $ coreFuncBody fun]
+                fun = core Map.! t
+
+        f (t:odo) done = f odo done
+        f [] done = []
 
 
 -- make an approximation of which functions are boxes at the start
