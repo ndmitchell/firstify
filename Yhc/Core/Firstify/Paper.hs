@@ -74,10 +74,9 @@ paper c = fromCoreFuncMap c2 $ coreReachableMap ["main"] res
 run :: CoreFuncMap -> SS CoreFuncMap
 run precore = do
     let cr = Map.map (applyBodyFunc wrapCoreFun) precore
-        orde = order cr
     modify $ \s -> s{info = Info Set.empty (Map.map coreFuncArity cr) Map.empty []
                     ,core = cr}
-    step False orde
+    step False (order cr)
 
 
 -- return True if they agree
