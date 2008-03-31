@@ -32,7 +32,7 @@ data S = S {terminate :: Terminate -- termination check
 
            -- used only in the individual step
            ,funS :: FunS
-           ,funSTemplate :: [Template]
+           ,usedS :: [CoreFuncName]
            
            -- used to loop round
            ,info :: Info
@@ -43,9 +43,9 @@ data S = S {terminate :: Terminate -- termination check
 data FunS = FunS
     {sBox :: [CoreFuncName]
     ,sArity :: [(CoreFuncName,Int)]
-    ,sTemplate :: Bool
+    ,sTemplate :: [Template]
     }
-emptyFunS = FunS [] [] False
+emptyFunS = FunS [] [] []
 
 
 data Info = Info
@@ -83,7 +83,7 @@ run precore = do
 checkStat :: Info -> FunS -> Bool
 checkStat i s = all (`Set.notMember` (iBox i)) (sBox s) &&
                 all (\(n,a) -> a == (iArity i Map.! n)) (sArity s) &&
-                not (sTemplate s)
+                null (sTemplate s)
 
 
 step :: Bool -> [CoreFuncName] -> SS CoreFuncMap
@@ -91,8 +91,11 @@ step chng (t:odo) = do
     i <- liftM info get
     core <- liftM core get
     let res = maybe True (not . checkStat i) $ Map.lookup t (iFunS i)
-    if not res then step chng odo else {- trace t $ -} do
-        modify $ \s -> s{funS = emptyFunS, funSTemplate = []}
+    if not res then do
+        modify $ \s -> let is = info s in s{info = is{iTemplate = sTemplate (iFunS is Map.! t) ++ iTemplate is}}
+        step chng odo
+     else do
+        modify $ \s -> s{funS = emptyFunS, usedS = []}
         fun <- func (arity i) (boxed i) (inline core) (template core (boxed i)) (core Map.! t)
         let a = coreFuncArity fun
         b <- isBox (boxed i) (coreFuncBody fun)
@@ -102,9 +105,10 @@ step chng (t:odo) = do
             Info {iBox = (if b then Set.insert t else id) (iBox i)
                  ,iArity = Map.insert t a (iArity i)
                  ,iFunS = Map.insert t (funS s) (iFunS i)
-                 ,iTemplate = funSTemplate s ++ iTemplate i}
+                 ,iTemplate = sTemplate (funS s) ++ iTemplate i}
             ,core = Map.insert t fun core}
-        step (chng || c) odo
+        s <- get
+        step (chng || c) (usedS s ++ odo)
     where
         arity i name = do
             let res = iArity i Map.! name
@@ -127,7 +131,9 @@ step True [] = do
 step False [] = do
     i <- liftM info get
     so <- get
-    if null $ iTemplate i then liftM core get else trace "Templating" $ do
+    if null $ iTemplate i then do
+        liftM core get
+     else trace "Templating" $ do
         res <- mapM f $ iTemplate i
         modify $ \s -> s{info = (info s){iTemplate=[]}}
         s <- get
@@ -150,8 +156,11 @@ step False [] = do
 -- should be main last, all its dependencies before
 -- but skip anything unreachable
 order :: CoreFuncMap -> [CoreFuncName]
-order core = reverse $ f ["main"] Set.empty
+order core = {- if sort res == sort expect then -} res {- else error "order failed" -}
     where
+        res = reverse $ f ["main"] Set.empty
+        expect = [name | CoreFunc name _ _ <- Map.elems $ coreReachableMap ["main"] core]
+    
         f (t:odo) done
                 | isCoreFunc fun && not (t `Set.member` done)
                 = t : f (calls++odo) (Set.insert t done)
@@ -209,6 +218,15 @@ func arity boxed inline template (CoreFunc name args body) = do
                     let xs2 = xs ++ map CoreVar vs
                     f . CoreLam vs =<< template x xs2
 
+        -- must go before the inline rule, or gets overlapped
+        f (CoreCase on alts) | not $ null ar = do
+                vs <- getVars $ maximum ar
+                let vs2 = map CoreVar vs
+                alts <- sequence [liftM ((,) a) $ f $ CoreApp b vs2 | (a,b) <- alts]
+                f . CoreLam vs =<< f (CoreCase on alts)
+            where
+                ar = [length vs | (_, CoreLam vs x) <- alts]
+
         -- INLINE RULE
         f o@(CoreCase (CoreApp (CoreFun x) xs) alts) = do
             b <- boxed x
@@ -236,14 +254,6 @@ func arity boxed inline template (CoreFunc name args body) = do
             cas <- f $ CoreCase on alts
             f $ CoreLet bind cas
 
-        f (CoreCase on alts) | not $ null ar = do
-                vs <- getVars $ maximum ar
-                let vs2 = map CoreVar vs
-                alts <- sequence [liftM ((,) a) $ f $ CoreApp b vs2 | (a,b) <- alts]
-                return $ CoreLam vs $ CoreCase on alts
-            where
-                ar = [length vs | (_, CoreLam vs x) <- alts]
-
         f (CoreCase on@(CoreApp (CoreCon x) xs) alts) =
                 (if null xs then return else f) $ head $ concatMap g alts
             where
@@ -260,19 +270,19 @@ func arity boxed inline template (CoreFunc name args body) = do
                     return (lhs, rhs)
 
         f (CoreLam vs1 (CoreLam vs2 x)) = return $ CoreLam (vs1++vs2) x
-        f (CoreLet bind (CoreLam vs x)) = liftM (CoreLam vs) $ f (CoreLet bind x)
+        f (CoreLet bind (CoreLam vs x)) = f . CoreLam vs =<< f (CoreLet bind x)
         f (CoreApp (CoreApp x y) z) = return $ CoreApp x (y++z)
 
         f (CoreLet bind x) = do
                 (bad,good) <- partitionM (\(a,b) -> return (isCoreLam b) `orM` isBox boxed b) bind
                 if null bad
                     then return $ CoreLet bind x
-                    else liftM (coreLet good) $ transformM (g bad) x
+                    else transformM f =<< liftM (coreLet good) (transformM (g bad) x)
             where
                 g bad (CoreVar x) = case lookup x bad of
                                     Nothing -> return $ CoreVar x
                                     Just y -> duplicateExpr y
-                g bad x = f x
+                g bad x = return x
 
         f x = return x
 
@@ -291,12 +301,12 @@ template core boxed x xs = do
         let holes = templateHoles o t
         case BiMap.lookupRev t (special s) of
             -- OPTION 2: Previously done
-            Just name ->
+            Just name -> do
+                modify $ \s -> s{usedS = name : usedS s}
                 return $ CoreApp (CoreFun name) holes
             -- OPTION 3: New todo
             done -> do
-                modify $ \s -> s{funSTemplate = t : funSTemplate s
-                                ,funS = (funS s){sTemplate=True}}
+                modify $ \s -> s{funS = (funS s){sTemplate = t : sTemplate (funS s)}}
                 return $ CoreApp (CoreFun x) xs
         where
             o = CoreApp (CoreFun x) xs
