@@ -9,6 +9,7 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
+import System.CPUTime
 import System.IO
 import Yhc.Core
 import Yhc.Core.Firstify
@@ -17,7 +18,7 @@ import Yhc.Core.Firstify.MitchellOld
 import qualified Data.Map as Map
 
 
-data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Paper | Normalise
+data Actions = Reynolds | Mitchell | Super | Stats | Help | MitchellOld | Paper | Normalise | CPU
              | Output String | MainIs CoreFuncName | OutCore | Text | Html | Verbose | Log
              deriving (Show,Eq)
 
@@ -37,6 +38,7 @@ opts =
     ,Option "t" ["text"]     (NoArg Text    ) "Output a text file of the Core"
     ,Option "h" ["html"]     (NoArg Html    ) "Output an HTML file of the Core"
     ,Option "?" ["help"]     (NoArg Help    ) "Show help message"
+    ,Option "x" ["cpu"]      (NoArg CPU     ) "CPU Time"
     ,Option ""  ["main"] (ReqArg MainIs "function") "Function to use instead of main"
     ]
 
@@ -76,6 +78,8 @@ main = do
                 hFlush stdout
             return c
     stats c
+    
+    tBegin <- getCPUTime
 
     c <- if Mitchell `notElem` acts then return c else do
         putStrLn "Performing Mitchell firstification"
@@ -92,6 +96,9 @@ main = do
     c <- if Reynolds `notElem` acts then return c else do
         putStrLn "Performing Reynold's firstification"
         stats $ reynolds c
+
+    tEnd <- getCPUTime
+    when (CPU `elem` acts) $ putStrLn $ "Time taken: " ++ showCPUTime (tEnd - tBegin)
 
     let ext = ['m' | Mitchell `elem` acts] ++ ['r' | Reynolds `elem` acts] ++
               ['s' | Super `elem` acts] ++ ['p' | Paper `elem` acts]
@@ -110,6 +117,10 @@ main = do
     when (Text `elem` acts) $ writeFile (out <.> "txt") (show c)
     when (Html `elem` acts) $ writeFile (out <.> "htm") (coreHtml c)
 
+
+
+showCPUTime :: Integer -> String
+showCPUTime x = show (x `div` 1000000000) ++ "ms"
 
 -- figure out where a file should go if we don't get an output location
 findOutput ext s = return $ replaceBaseName s (takeBaseName s <.> ext)
