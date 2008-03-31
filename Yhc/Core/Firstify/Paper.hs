@@ -92,7 +92,7 @@ step chng (t:odo) = do
     i <- liftM info get
     core <- liftM core get
     let res = maybe True (not . checkStat i) $ Map.lookup t (iFunS i)
-    if not res then step chng odo else trace t $ do
+    if not res then step chng odo else {- trace t $ -} do
         modify $ \s -> s{funS = emptyFunS, funSTemplate = []}
         fun <- func (arity i) (boxed i) (inline core) (template core (boxed i)) (core Map.! t)
         let a = coreFuncArity fun
@@ -132,7 +132,7 @@ step False [] = do
         res <- mapM f $ iTemplate i
         modify $ \s -> s{info = (info s){iTemplate=[]}}
         s <- get
-        trace (show res) $ step False (res ++ order (core so))
+        step False (res ++ order (core so))
     where
         f t = do
             s <- get
