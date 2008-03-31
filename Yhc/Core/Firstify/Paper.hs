@@ -218,6 +218,8 @@ func arity boxed inline template (CoreFunc name args body) = do
                         on <- f $ CoreApp y xs
                         f $ CoreCase on alts
 
+        f (CoreCase (CoreFun x) _) = error "unwrapped fun"
+
         -- SIMPLIFY RULES
         f (CoreApp (CoreLam vs x) ys) = do
                 transformM f $ coreApp (coreLam vs2 x2) ys2
@@ -288,7 +290,7 @@ template core boxed x xs = do
         case BiMap.lookupRev t (special s) of
             -- OPTION 2: Previously done
             Just name ->
-                return $ coreApp (CoreFun name) holes
+                return $ CoreApp (CoreFun name) holes
             -- OPTION 3: New todo
             done -> do
                 modify $ \s -> s{funSTemplate = t : funSTemplate s
