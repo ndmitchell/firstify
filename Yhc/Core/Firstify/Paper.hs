@@ -32,21 +32,27 @@ data S = S {terminate :: Terminate -- termination check
 
            -- used only in the individual step
            ,funS :: FunS
+           ,funSTemplate :: [Template]
+           
+           -- used to loop round
+           ,info :: Info
+           ,core :: CoreFuncMap
            }
 
 
 data FunS = FunS
     {sBox :: [CoreFuncName]
     ,sArity :: [(CoreFuncName,Int)]
-    ,sTemplate :: [Template]
+    ,sTemplate :: Bool
     }
-emptyFunS = FunS [] [] []
+emptyFunS = FunS [] [] False
 
 
 data Info = Info
     {iBox :: Set.Set CoreFuncName
     ,iArity :: Map.Map CoreFuncName Int
     ,iFunS :: Map.Map CoreFuncName FunS
+    ,iTemplate :: [Template]
     }
 
 
@@ -58,61 +64,87 @@ instance UniqueId S where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 paper :: Core -> Core
-paper c = fromCoreFuncMap c2 res
+paper c = fromCoreFuncMap c2 $ coreReachableMap ["main"] res
     where
         res = evalState (liftM toCoreFuncMap (uniqueBoundVarsCore c2) >>= run) (s0 :: S)
-        s0 = S (emptyTerminate True) BiMap.empty c2 0 (uniqueFuncsNext c2) emptyFunS
+        s0 = S (emptyTerminate True) BiMap.empty c2 0 (uniqueFuncsNext c2) emptyFunS [] undefined undefined
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
 
 run :: CoreFuncMap -> SS CoreFuncMap
-run precore = step i False core orde
-    where
-        i = Info (boxApprox core orde) (Map.map coreFuncArity core) Map.empty
-        core = Map.map (applyBodyFunc wrapCoreFun) precore
-        orde = order core
+run precore = do
+    let cr = Map.map (applyBodyFunc wrapCoreFun) precore
+        orde = order cr
+    modify $ \s -> s{info = Info (boxApprox cr orde) (Map.map coreFuncArity cr) Map.empty []
+                    ,core = cr}
+    step False orde
 
 
 -- return True if they agree
 checkStat :: Info -> FunS -> Bool
 checkStat i s = all (`Set.notMember` (iBox i)) (sBox s) &&
-                all (\(n,a) -> a == (iArity i Map.! n)) (sArity s)
+                all (\(n,a) -> a == (iArity i Map.! n)) (sArity s) &&
+                not (sTemplate s)
 
 
-step :: Info -> Bool -> CoreFuncMap -> [CoreFuncName] -> SS CoreFuncMap
-step i chng core (t:odo) 
-    | maybe True (not . checkStat i) $ Map.lookup t (iFunS i)
-    = do
-    modify $ \s -> s{funS = emptyFunS}
-    fun <- func arity boxed (inline core) (template core) (core Map.! t)
-    let a = coreFuncArity fun
-    b <- isBox boxed (coreFuncBody fun)
-    let c = a /= iArity i Map.! t ||
-            b /= t `Set.member` iBox i
-    s <- get
-    i <- return $ Info {iBox = (if b then Set.insert t else id) (iBox i)
-                       ,iArity = Map.insert t a (iArity i)
-                       ,iFunS = Map.insert t (funS s) (iFunS i)
-                       }
-    core <- return $ Map.insert t fun core
-    step i (chng || c) core odo
+step :: Bool -> [CoreFuncName] -> SS CoreFuncMap
+step chng (t:odo) = do
+    i <- liftM info get
+    core <- liftM core get
+    let res = maybe True (not . checkStat i) $ Map.lookup t (iFunS i)
+    if not res then step chng odo else trace t $ do
+        modify $ \s -> s{funS = emptyFunS, funSTemplate = []}
+        fun <- func (arity i) (boxed i) (inline core) (template core (boxed i)) (core Map.! t)
+        let a = coreFuncArity fun
+        b <- isBox (boxed i) (coreFuncBody fun)
+        let c = a /= iArity i Map.! t ||
+                b /= t `Set.member` iBox i
+        modify $ \s -> s{info = 
+            Info {iBox = (if b then Set.insert t else id) (iBox i)
+                 ,iArity = Map.insert t a (iArity i)
+                 ,iFunS = Map.insert t (funS s) (iFunS i)
+                 ,iTemplate = funSTemplate s ++ iTemplate i}
+            ,core = Map.insert t fun core}
+        step (chng || c) odo
     where
-        arity name = do
+        arity i name = do
             let res = iArity i Map.! name
             modifyS $ \s -> s{sArity = (name,res) : sArity s}
             return res
 
-        boxed name = do
+        boxed i name = do
             let res = name `Set.member` iBox i
             when (not res) $ modifyS $ \s -> s{sBox = name : sBox s}
             return res
 
         modifyS f = modify $ \s -> s{funS = f (funS s)}
 
-step i chng core (t:odo) = step i chng core odo
+step True [] = do
+    modify $ \s -> s{info = (info s){iTemplate=[]}}
+    s <- get
+    trace "Simplifying" $ step False (order $ core s)
 
-step i False core [] = return core
-step i True core [] = step i False core (order core)
+-- generate the templates and retry
+step False [] = do
+    i <- liftM info get
+    so <- get
+    if null $ iTemplate i then liftM core get else trace "Templating" $ do
+        res <- mapM f $ iTemplate i
+        modify $ \s -> s{info = (info s){iTemplate=[]}}
+        s <- get
+        trace (show res) $ step False (res ++ order (core so))
+    where
+        f t = do
+            s <- get
+            let name = uniqueJoin (templateName t) (funcId s)
+            fun <- templateGenerate (core s Map.!) name t
+            modify $ \s -> s{funcId = funcId s + 1
+                            ,special = BiMap.insert name t (special s)
+                            ,core = Map.insert name fun (core s)
+                            ,info = (info s){iArity = Map.insert name (coreFuncArity fun) $ iArity (info s)}
+                            }
+            return name
+
 
 
 -- which order should we do this in
@@ -188,8 +220,7 @@ func arity boxed inline template (CoreFunc name args body) = do
 
         -- SIMPLIFY RULES
         f (CoreApp (CoreLam vs x) ys) = do
-                x2 <- transformExprM f x2
-                return $ coreApp (coreLam vs2 x2) ys2
+                transformM f $ coreApp (coreLam vs2 x2) ys2
             where
                 i = min (length vs) (length ys)
                 (vs1,vs2) = splitAt i vs
@@ -248,6 +279,44 @@ inline core name = do
     liftM Just $ duplicateExpr $ coreLam args body
 
 
-template :: CoreFuncMap -> CoreFuncName -> [CoreExpr] -> SS CoreExpr
-template core name args = return $ CoreApp (CoreFun name) args
+template :: CoreFuncMap -> (CoreFuncName -> SS Bool) -> CoreFuncName -> [CoreExpr] -> SS CoreExpr
+template core boxed x xs = do
+    t <- liftM templateNorm $ templateCheck2 boxed x xs
+    if prim || t == templateNone then return o else do
+        s <- get
+        let holes = templateHoles o t
+        case BiMap.lookupRev t (special s) of
+            -- OPTION 2: Previously done
+            Just name ->
+                return $ coreApp (CoreFun name) holes
+            -- OPTION 3: New todo
+            done -> do
+                modify $ \s -> s{funSTemplate = t : funSTemplate s
+                                ,funS = (funS s){sTemplate=True}}
+                return $ CoreApp (CoreFun x) xs
+        where
+            o = CoreApp (CoreFun x) xs
+            prim = isCorePrim $ core Map.! x
+
+
+templateCheck2 :: (CoreFuncName -> SS Bool) -> CoreFuncName -> [CoreExpr] -> SS Template
+templateCheck2 isHO x xs = join (CoreApp (CoreFun x)) (map f xs)
+    where
+        free = collectFreeVars (CoreApp (CoreFun x) xs)
+        f (CoreLam vs x) = liftM (CoreLam vs) (f x)
+        f (CoreVar x) | x `notElem` free = return $ CoreVar x
+        f (CoreApp (CoreFun x) xs) = do
+            b <- isHO x
+            if b
+                then liftM (CoreApp (CoreFun x)) (mapM f xs)
+                else join (CoreApp (CoreFun x)) (map f xs)
+        f (CoreApp x xs) | isCoreCon x || isCoreFun x = join (CoreApp x) (map f xs)
+        f x = join generate (map f children)
+            where (children,generate) = uniplate x
+
+        join g xs = do
+            xs <- sequence xs
+            if any (/= templateNone) xs
+                then return $ g xs
+                else return templateNone
 
