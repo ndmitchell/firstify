@@ -34,8 +34,16 @@ c x = x-(3::Int)
 
 main4 x = even (x :: Int)
 
+main4_5 = f4_5 (1::Int)
+
+f4_5 = case id True of
+              True -> id
+              False -> id
+
 
 main5 x = show (x :: Int)
+
+main5_1 x = show (x :: Char)
 
 
 main6 = show [()]
