@@ -681,28 +681,32 @@ Specialisation is the only stage which introduces new function names. In order t
 underscore = undefined :: Expr
 \end{code}
 \end{comment}
-\todo{Tidy this code up!}
 \begin{code}
 template :: Expr -> Expr
-template (EFun f xs_)  = map (t []) xs_ & EFun f
+template (EFun f xs_)  = apply (EFun f) $ map (tem []) xs_
 template _            = underscore
 
-t :: [String] -> Expr -> Expr
-t seen y =  let t' = t seen in case y of
-    ELam v x       ->  ELam v (t (v:seen) x)
-    EFun f xs_     |   isBox y -> EFun f (map t' xs_)
+tem :: [String] -> Expr -> Expr
+tem seen y =  let tem' = tem seen in case y of
+    ELam v x       ->  ELam v (tem (v:seen) x)
+    EFun f xs_     |   isBox y -> EFun f (tems' xs_)
     EVar v         ->  if v `elem` seen then EVar v else underscore
-    EFun f xs_     ->  map t' xs_ & EFun f
-    ECon c xs_     ->  map t' xs_ & ECon c
-    EApp x xs_     ->  map t' (x:xs_) & \(x:xs_) -> EApp x xs_
-    ELet v x y     ->  [x,y] &
-                      \[x,_] -> ELet v x (t (v:seen) y)
-    ECase x alts_  ->  (t' x : map (t' . rhs) alts_) &
-                      \(x:_) -> ECase x (map g alts_)
-        where g (Alt c vs_ x) = Alt c vs_ (f (vs_++seen) x)
+    EFun f xs_     ->  apply (EFun f) $ tems' xs_
+    ECon c xs_     ->  apply (ECon c) $ tems' xs_
+    EApp x xs_     ->  apply  (\(x:xs_) -> EApp x xs_) $ tems' (x:xs_)
+    ELet v x y     ->  apply  (\[x,_] ->
+                              ELet v x (tem (v:seen) y)) $
+                              tems' [x,y]
+    ECase x alts_  ->  apply  (\(x:_) ->
+                              ECase x (map alt alts_)) $
+                              tems' (x:map rhs alts_)
+    where
+        tem' = tem seen
+        tems' = map tem'
+        alt (Alt c vs_ x) = Alt c vs_ (tem (vs_++seen) x)
 
-(&) :: [Expr] -> ([Expr] -> Expr) -> Expr
-(&) xs f = if all (== underscore) xs then underscore else f xs
+apply :: ([Expr] -> Expr) -> [Expr] -> Expr
+apply f xs = if all (== underscore) xs then underscore else f xs
 \end{code}
 \caption{Template generation function.}
 \label{fig:template_generation}
@@ -1234,7 +1238,7 @@ One torture test we have used during development is \ignore|show (1 :: Double)|.
 While very few programs have residual functional values, a substantial number make use of applications to a non-function/non-constructor, and use over-application of functions. In most cases these result from supplying |error| calls with additional arguments, typically related to the desugaring of |do| notation and pattern matching within Yhc.
 
 \subsection{Size}
- 
+
 On average the size of the resultant program is smaller by 33\%. We measured program size by taking the number of nodes in the abstract syntax tree. The reason for the decrease in program size is due to dictionaries holding references to unnecessary code.
 
 
