@@ -1150,31 +1150,32 @@ Given an initial program, the arity raising, inlining and specialisation stages 
 \textbf{Bound} is the numeric bound use for the termination (see \S\ref{sec:termination_specialisation});
 \textbf{HO Create} the number of lambda expressions and under-applied functions, first in the input program and then in the output program;
 \textbf{HO Use} the number of application expressions and over-applied functions;
+\textbf{Time} is the time to run our method;
 \textbf{Size} the change in the program size measured as the number of nodes in the abstract syntax tree.
 
 \smallskip\smallskip
 
-\begin{tabular*}{\linewidth}{lrrrrrrlll}
-\textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Size} \\
+\begin{tabular*}{\linewidth}{@@{}l@@{\!\!}rrrrrrrrr}
+\textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Time} & \textbf{Size} \\
 \vspace{-1ex} \\
-bernouilli      & 4 & 240 & 0 & 190 & 2 & -32\% \\
-digits-of-e1    & 4 & 217 & 0 & 153 & 2 & -35\% \\
-digits-of-e2    & 5 & 236 & 0 & 198 & 3 & -32\% \\
-exp3\_8         & 4 & 232 & 0 & 154 & 2 & -39\% \\
-gen\_regexps    & 7 & 116 & 0 &  69 & 0 & -31\% \\
-integrate       & 4 & 348 & 0 & 358 & 2 & -38\% \\
-paraffins       & 4 & 360 & 0 & 351 & 2 & -53\% \\
-primes          & 4 & 217 & 0 & 148 & 2 & -38\% \\
-queens          & 4 & 217 & 0 & 146 & 2 & -38\% \\
-rfib            & 4 & 338 & 0 & 355 & 2 & -31\% \\
-tak             & 4 & 212 & 0 & 145 & 4 & -40\% \\
-wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & -35\% \\
-wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & -36\% \\
-x2n1            & 4 & 345 & 0 & 385 & 2 & -57\% \\
-\multicolumn{8}{l} \ldots{}plus 35 tests from the spectral suite\ldots{} \\
-Minimum         & 2 & 60 & 0 & 46 & 0 & -78\% \\
-Maximum         & 14 & 437 & 1 & 449 & 100 & 15\% \\
-Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & -33\% \\
+bernouilli      & 4 & 240 & 0 & 190 & 2 & 0.4 & -32\% \\
+digits-of-e1    & 4 & 217 & 0 & 153 & 2 & 0.3 & -35\% \\
+digits-of-e2    & 5 & 236 & 0 & 198 & 3 & 0.4 & -32\% \\
+exp3\_8         & 4 & 232 & 0 & 154 & 2 & 0.3 & -39\% \\
+gen\_regexps    & 7 & 116 & 0 &  69 & 0 & 0.1 & -31\% \\
+integrate       & 4 & 348 & 0 & 358 & 2 & 0.8 & -38\% \\
+paraffins       & 4 & 360 & 0 & 351 & 2 & 0.7 & -53\% \\
+primes          & 4 & 217 & 0 & 148 & 2 & 0.2 & -38\% \\
+queens          & 4 & 217 & 0 & 146 & 2 & 0.3 & -38\% \\
+rfib            & 4 & 338 & 0 & 355 & 2 & 0.8 & -31\% \\
+tak             & 4 & 212 & 0 & 145 & 4 & 0.3 & -40\% \\
+wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & 0.3 & -35\% \\
+wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & 0.3 & -36\% \\
+x2n1            & 4 & 345 & 0 & 385 & 2 & 0.8 & -57\% \\
+& \multicolumn{8}{l} \;\;\;\;\;\;\;\ldots{}plus 35 tests from the spectral suite\ldots{} \\
+Minimum         & 2 & 60 & 0 & 46 & 0 & 0.1  & -78\% \\
+Maximum         & 14 & 437 & 1 & 449 & 100 & 1.0  & 15\% \\
+Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & 0.4  & -33\% \\
 \hline
 \end{tabular*}
 \end{table}
@@ -1236,6 +1237,19 @@ One torture test we have used during development is \ignore|show (1 :: Double)|.
 \subsection{HO Use}
 
 While very few programs have residual functional values, a substantial number make use of applications to a non-function/non-constructor, and use over-application of functions. In most cases these result from supplying |error| calls with additional arguments, typically related to the desugaring of |do| notation and pattern matching within Yhc.
+
+\subsection{Time}
+
+The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2 \cite{ghc}. The longest execution time was only one second, with the average time at under half a second. The programs requiring most time made use of floating point numbers, suggesting that it is the library code which is requiring substantial effort to defunctionalise. If abstractions were given for library methods, the execution time would drop substantially.
+
+In order to gain acceptable speed, we performed a number of optimisations over the algorithm presented in \S\ref{sec:detailed}:
+
+\begin{itemize}
+\item We transform functions in order, starting at the leaves of the call graph.
+\item We delay the transform of dictionary components, as these will often be eliminated.
+\item We fuse the inlining, arity raising and simplification stages.
+\item We track the arity and boxed lambda result of each function.
+\end{itemize}
 
 \subsection{Size}
 
@@ -1306,6 +1320,7 @@ Many analysis methods, in fields such as strictness analysis and termination ana
 
 The following script can be supplied to the AProVe system \cite{aprove} to check termination of our simplification rules, as described in \S\ref{sec:termination_simplification}.
 
+\noindent\begin{minipage}{\linewidth}
 \begin{verbatim}
 [x,y,z]
 app(lam(x),y)    -> let(y,x)
@@ -1316,6 +1331,7 @@ case(con(x),y)   -> let(x,y)
 case(x,lam(y))   -> lam(case(x,app(lam(y),var)))
 let(lam(x),y)    -> lam(let(x,y))
 \end{verbatim}
+\end{minipage}
 
 
 \bibliographystyle{plainnat}
