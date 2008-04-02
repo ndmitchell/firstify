@@ -3,7 +3,7 @@ import Prelude hiding (map)
 import Data.List hiding (map)
 
 -- # do
--- # c ; v ; y ; v_1 ; i ; s_0
+-- # c ; v ; y ; v_1 ; i ; s_0 ; n ; l_n' ; xs_
 -- # IO ; Double
 -- # Show
 -- # primCatch
