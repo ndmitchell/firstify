@@ -75,7 +75,7 @@ primNeqInt, primEqInt :: Int -> Int -> Bool
 \maketitle
 
 \begin{abstract}
-We describe an automated transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice it is remarkably successful.
+We describe an automated transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice it is remarkably successful.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -125,8 +125,8 @@ Our method has been implemented in Haskell \cite{haskell}, and operates over the
 Our paper makes the following contributions:
 
 \begin{itemize}
-\item We define a defunctionalisation method which, unlike some previous work, does not introduce new types.
-\item Our method can deal well with the complexities of a language like Haskell, including type classes, continuations and monads.
+\item We define a defunctionalisation method which, unlike some previous work, does not introduce new data types.
+\item Our method can deal with the complexities of a language like Haskell, including type classes, continuations and monads.
 \item Our method makes use of standard transformation steps, but combined in a novel way.
 \item We identify restrictions which guarantee termination, but are not overly limiting.
 \item We have implemented our method, and present measured results for much of the nofib benchmark suite.
@@ -175,16 +175,16 @@ rhs :: Alt -> Expr
 \end{code}
 \end{comment}
 
-We let |v| range over variables, |x| over expressions, |f| over function names and |c| over constructors.
+We let |v| range over variables, |x| and |y| over expressions, |f| over function names and |c| over constructors.
 \caption{Core Language.}
 \label{fig:core}
 \end{figure}
 
 Our Core language is presented in Figure \ref{fig:core}. A program is a set of functions, with a root function named |main|. A function definition consists of a name, a list of argument variables, and a body expression. The arity of a function is the number of arguments in its definition. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}.
 
-The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented as a lambda expression.) A named application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arguments, body and arity of |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented as a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arity, body and arguments of |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
 
-Informally, a program is higher-order if at runtime the program generates and manipulates functional values. As functional values can only be created in two ways; (1) a lambda expression and (2) a partially-applied function application, we make the following definition:
+Informally, a program is higher-order if at runtime the program creates functional values. Functional values can only be created in two ways: (1) a lambda expression; or (2) a partially-applied function application. We therefore make the following definition:
 
 \begin{definition}
 A program which contains no lambda expressions and no partially-applied functions is first-order.
@@ -213,7 +213,7 @@ Each transformation has the possibility of removing some functional values, but 
 firstify = simplify +|+ arity +|+ inline +|+ specialise
 \end{code}
 
-We proceed by first giving a brief flavour of how these transformations used in isolation may remove some functional values. We then discuss them in detail in \S\ref{sec:detailed}, including how they can be combined.
+We proceed by first giving a brief flavour of how these transformations may be used in isolation to remove functional values. We then discuss the transformations in detail in \S\ref{sec:detailed}, including how they can be combined.
 
 \subsection{Simplification}
 
@@ -235,15 +235,15 @@ one = let x = 1 in x
 
 \begin{example}
 \begin{code}
-even =  let one = 1
-        in \x -> not (odd x)
+even =  let  one = 1
+        in   \x -> not (odd x)
 \end{code}
 
 \noindent A simplification rule lifts the lambda outside of the let expression.
 
 \begin{code}
-even = \x ->  let one = 1
-              in not (odd x)
+even = \x ->  let  one = 1
+              in   not (odd x)
 \end{code}
 
 \noindent In general this transformation may cause duplicate computation to be performed, an issue we return to in \S\ref{sec:sharing}.
@@ -259,7 +259,7 @@ The arity raising transformation increases the definition arity of functions wit
 even = \x -> not (odd x)
 \end{code}
 
-Here the arity raising transformation lifts the argument to the lambda into a definition-level argument, increasing the arity.
+\noindent Here the arity raising transformation lifts the argument to the lambda into a definition-level argument, increasing the arity.
 
 \begin{code}
 even x = not (odd x)
@@ -385,7 +385,7 @@ The expression |f +||+ g| applies |f| to an input until it reaches a fixed point
 propFix f g x = let r = (+|+) f g x in (f r == r) && (g r == r)
 \end{code}
 
-\item[Overall idempotence] The operation as a whole is idempotent.
+\item[Idempotence] The operation as a whole is idempotent.
 
 \begin{code}
 propIdempotent f g x = let op = f +|+ g in op (op x) == op x
@@ -404,7 +404,7 @@ firstify = ((simplify +|+ arity) +|+ inline) +|+ specialise
 
 Within this chain we can guarantee that the end result will be a fixed point of every component transformation. Additionally, before each transformation is applied, those to the left will have reached fixed points.
 
-The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent if it is the result of |(+||+)|, so much computation is duplicated. The |(+||+)| operator also checks for global equality, when typically operations will only operate within some locality, which could be exploited.
+The operator |(+||+)| is written for clarity, not for speed. If the first argument is idempotent, then additional unnecessary work is performed. In the case of chaining operators, the left function is guaranteed to be idempotent if it is the result of |(+||+)|, so much computation is duplicated. We describe further optimisations in \S\ref{sec:time}.
 
 We describe each of the stages in the algorithm separately. In all subsequent stages, we assume that all the simplification rules have been applied.
 
@@ -466,7 +466,7 @@ case (case x of {... ; c vs_ -> y ; ...}) of alts_
 \ignore\begin{code}
 case x of {... ; c vs_ -> \v -> y ; ...}
     => \z -> case  x of
-                   {... ; c vs_ -> (\v -> y) z ; ...} z
+                   {... z ; c vs_ -> (\v -> y) z ; ... z}
 \end{code}}
 
 \simp{eta}{
@@ -513,7 +513,7 @@ The simplification stage has the goal of moving lambda expressions upwards, and 
 
 \subsubsection{Lambda Introduction}
 
-The (eta) rule inserts lambdas where possible, using $\eta$-expansion. If the input program has been generated by the Yhc compiler it has been lambda lifted \cite{lambda_lift}, replacing lambda expressions with partial application. This rule removes all occurrences of partial-application, replacing them with explicit lambda expressions. The simplification rules move these lambda expressions around, attempting to lift them to the top level.
+The (eta) rule inserts lambdas where possible, using $\eta$-expansion. For each partially applied function, a lambda expression is inserted to ensure that the function is given at least as many arguments as its associated arity.
 
 \begin{example}
 \ignore\begin{code}
@@ -535,7 +535,7 @@ even x = (.) (\y -> not y) (\z -> odd z) x
 \end{code}
 \end{example}
 
-For each partially applied function, a lambda expression is inserted to ensure that the function is now given at least as many arguments as its associated arity. This step trades one form of functional value for another form, but has the advantage of making functional values more explicit, and permitting arity raising.
+This replaces partial application with lambda expressions, and has the advantage of making functional values more explicit, permitting arity raising.
 
 \subsubsection{Lambda Movement}
 \label{sec:sharing}
@@ -544,8 +544,8 @@ The (case-lam) rule lifts a lambda within a case alternative outside the case ex
 
 \begin{example}
 \begin{code}
-f x =  let i = expensive x
-       in \j -> i + j
+f x =  let  i = expensive x
+       in   \j -> i + j
 
 main xs = map (f 1) xs
 \end{code}
@@ -553,8 +553,8 @@ main xs = map (f 1) xs
 Here |(expensive 1)| is computed once and saved. Every application of the functional argument within |map| performs a single |(+)| operation. After applying the (let-lam) rule we get:
 
 \begin{code}
-f x =  \j ->  let i = expensive x
-              in i + j
+f x =  \j ->  let  i = expensive x
+              in   i + j
 \end{code}
 
 Now |expensive| is recomputed for every element in |xs|. We include this rule in our simplifier, focusing on functional value removal at the expense of sharing.
@@ -572,7 +572,7 @@ function vs_ = \v -> x
 \end{code}
 \end{definition}
 
-Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the definition-level arguments for the function. This transformation requires the body to be a lambda expression, so additional transformations are necessary to introduce and move lambda expressions. If a function has its arity increased, fully-applied uses become partially-applied, causing the (eta) simplification rule to fire.
+Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the definition-level arguments for the function. If a function has its arity increased, fully-applied uses become partially-applied, causing the (eta) simplification rule to fire.
 
 
 \subsection{Inlining}
@@ -599,7 +599,7 @@ isLambda _           = False
 An expression |e| is a boxed lambda if |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}.
 \end{definition}
 
-The |isBox| as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not change the result of any previously terminating evaluations.
+The |isBox| function as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is false in any duplicate call. This modification does not change the result of any previously terminating evaluations.
 
 \begin{example}
 Recalling that |[e]| is shorthand for |(:) e []|, where |(:)| is the cons constructor, the following expressions are boxed lambdas:
@@ -611,7 +611,7 @@ Recalling that |[e]| is shorthand for |(:) e []|, where |(:)| is the cons constr
 [Nothing, Just (\x -> x)]
 \end{code}
 
-The following are \textit{not} boxed lambdas:
+\noindent The following are \textit{not} boxed lambdas:
 
 \ignore\begin{code}
 \x -> id x
@@ -626,9 +626,12 @@ The final expression \textit{evaluates to} a boxed lambda, but this information 
 The inlining transformation is specified by:
 
 \ignore\begin{code}
-case (f xs_) alts_
-    => case (let args f = xs_ in body f) alts_
-    where isBox (body f)
+case (f xs_) of alts_
+    => case (let vs_ = xs_ in y) alts_
+    where 
+        vs_ = args f
+        y = body f
+        {-" \text{If } "-} isBox y {-" \text{ evaluates to } "-} True
 \end{code}
 \end{definition}
 
@@ -656,7 +659,7 @@ map f xs = case  xs of
                  y:ys  -> f y : map f ys
 \end{code}
 
-Specialisation first finds the application of |map| in |main|, and generates the template \ignore|map (\x -> x) _|. It then generates a unique name for the template (we choose |map_id|), and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including in the call to |map| within the freshly generated |map_id|.
+Specialisation first finds the application of |map| in |main|, and generates the template \ignore|map (\x -> x) _|. It then generates a unique name for the template (we choose |map_id|), and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including the call to |map| within the freshly generated |map_id|.
 
 \begin{code}
 main xs = map_id xs
@@ -713,18 +716,19 @@ apply f xs = if all (== underscore) xs then underscore else f xs
 \label{fig:template_generation}
 \end{figure}
 
-A template is generated if an expression is an application of a top-level function, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda -- as calculated by the |template| function in Figure \ref{fig:template_generation}. The template additionally includes all sub-expressions whose removal would lead to functional values in |underscore| positions, and all free variables bound within the template.
+A template is generated if an expression is a function application, whose arguments include a sub-expression which is either a lambda expression or a boxed lambda -- as calculated by the |template| function in Figure \ref{fig:template_generation}. The template additionally includes all sub-expressions whose removal would lead to functional values as omitted subexpressions, and all free variables bound within the template.
 
 \begin{example}
-\noindent\begin{tabular}{ll}
+\noindent\begin{tabular}{@@{}ll}
 Expression & Template \\
 |id (\x -> x)|                & |id (\x -> x)| \\
 |id (Just (\x -> x))|         & |id (Just (\x -> x))| \\
 |id (\x -> let y = 12 in 4)|  & |id (\x -> underscore)| \\
 |id (\x -> let y = 12 in x)|  & |id (\x -> let y = underscore in x)| \\
 \end{tabular}
+\smallskip
 
-In all examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, there are subexpressions which do not depend on variables bound within the lambda -- these have been removed. The |Just| constructor is also not dependent on the bound variables, but its removal would require a functional argument as a parameter, so it is left as part of the template.
+In all examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, there are subexpressions which do not depend on variables bound within the lambda -- these have been removed and replaced with underscores. The |Just| constructor is also not dependent on the bound variables, but its removal would require a functional argument as a parameter, so it is left as part of the template.
 \end{example}
 
 \subsubsection{Generating Functions}
@@ -1260,6 +1264,7 @@ For the purposes of testing defunctionalisation, we have worked on unmodified Yh
 While very few programs have residual functional values, a substantial number make use of applications to a non-function/non-constructor, and use over-application of functions. In most cases these result from supplying |error| calls with additional arguments, typically related to the desugaring of |do| notation and pattern matching within Yhc.
 
 \subsection{Execution Time (Time in Table \ref{tab:results})}
+\label{sec:time}
 
 The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2 \cite{ghc}. The longest execution time was only one second, with the average time under half a second. The programs requiring most time made use of floating point numbers, suggesting that library code requires most effort to defunctionalise. If abstractions were given for library methods, the execution time would drop substantially.
 
@@ -1329,11 +1334,11 @@ The specialisation and inlining steps are taken from existing program optimisers
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on a substantially first-order equivalent.
+Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs.
 
-Our method has already found practical use within the Catch tool, and we hope it can be of benefit to others. We have released our tool, both as a command line version, and as an API that analysis programs can invoke. Currently the implementation is based around the core language from the Yhc compiler, which restricts our input programs to the Haskell 98 language. By making use of the GHC front end, we could deal with a greater number of extensions.
+Our method has already found practical use within the Catch tool, and we hope it can be of benefit to others. We have released our tool, both as a command line program, and as a library that analysis programs can invoke. Currently the implementation is based around the core language from the Yhc compiler, which restricts our input programs to the Haskell 98 language. By making use of the GHC front end, we could deal with many language extensions.
 
-Our method is whole program, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed source libraries. We may be able to relax this requirement, computing first-order variants of libraries in advance, or permitting some components of the program to be ignored.
+Our method is whole program, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
 
 We have developed our method for analysis, not performance. However, for many simple examples, the resultant program performs better than the original. By restricting rules that reduce sharing, our defunctionalisation method may be appropriate for integration into an optimising compiler.
 
