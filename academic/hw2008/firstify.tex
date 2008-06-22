@@ -164,7 +164,7 @@ data Expr = ELam String Expr
           | ECase Expr [Alt]
           | ELet String Expr Expr
 
-data Alt = Alt String [String] Expr
+data Alt = EAlt String [String] Expr
 
 arity :: String -> Int
 body :: String -> Expr
