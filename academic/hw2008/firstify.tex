@@ -42,13 +42,23 @@
      \noindent\textbf{Definition:}}
     {\noexample}
 
+\hsdef{\begin{comment}
+Show
+f,x,y,g,v,e,s_0,l',b',n,l_n,s,l_n',xs,b_n',e_n,e_6
+lp,p,bp,l
+app,lam,fun,con
+\end{comment}}
 \begin{comment}
-% for paper haskell
 \begin{code}
-f = undefined
-\end{code}
-\begin{code}
-primNeqInt, primEqInt :: Int -> Int -> Bool
+import Prelude hiding (map)
+import Data.List hiding (map)
+
+instance Eq Expr
+
+data World = World
+expensive :: a -> b
+primEqInt, primNeqInt :: Int -> Int -> Bool
+primCatch :: alpha -> (IOError -> alpha) -> alpha
 \end{code}
 \end{comment}
 
