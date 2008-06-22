@@ -64,7 +64,7 @@ primCatch :: alpha -> (IOError -> alpha) -> alpha
 
 \begin{document}
 
-\conferenceinfo{ICFP '08}{date, City.} %
+\conferenceinfo{Haskell Symposium 2008}{date, City.} %
 \copyrightyear{2008} %
 \copyrightdata{[to be supplied]}
 
@@ -188,7 +188,7 @@ We let |v| range over variables, |x| and |y| over expressions, |f| over function
 \label{fig:core}
 \end{figure}
 
-Our Core language is presented in Figure \ref{fig:core}. A program is a set of functions, with a root function named |main|. A function definition consists of a name, a list of argument variables, and a body expression. The arity of a function is the number of arguments in its definition. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}.
+Our Core language is presented in Figure \ref{fig:core}. A program is a set of functions, with a root function named |main|. A function definition consists of a name, a list of argument variables, and a body expression. The arity of a function is the number of arguments in its definition. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We allow full Haskell 98 data types, and assume that all Core programs are type correct.
 
 The variable, case, let, application and lambda expressions are much as they would be in any Core language. The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented as a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f|, |body f| and |args f| to denote the arity, body and arguments of |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
 
@@ -211,8 +211,8 @@ Our method works by combining three separate and well-known transformations. Eac
 
 \begin{description}
 \item[Arity Raising:] A function can be arity raised if the body of the function is a lambda expression. In this situation, the variables bound by the lambda can be added instead as arguments of the function definition.
-\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied in depth.
-\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialise functions to a given constructor \cite{spj:specconstr}.
+\item[Inlining:] Inlining is a standard technique in optimising compilers \cite{spj:inlining}, and has been studied in depth. Inlining involves replacing an application of a function with the body of the function.
+\item[Specialisation:] Specialisation is another standard technique, used to remove type classes \cite{jones:dictionary_free} and more recently to specialise functions to a given constructor \cite{spj:specconstr}. Specialisation involves generating a new function specialised with information about the functions arguments.
 \end{description}
 
 Each transformation has the possibility of removing some functional values, but the key contribution of this paper is \textit{how they can be used together}. Using the fixed point operator |(+||+)| introduced in \S\ref{sec:detailed}, their combination is:
@@ -1239,7 +1239,7 @@ Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & 0.4  & -33\% \\
 \end{tabular*}
 \end{table}
 
-We have tested our method with programs drawn from the nofib benchmark suite, and the results are given in Table \ref{tab:results}. Looking at the input Core programs, we see many sources of functional values.
+We have tested our method with programs drawn from the nofib benchmark suite \cite{nofib}, and the results are given in Table \ref{tab:results}. Looking at the input Core programs, we see many sources of functional values.
 
 \begin{itemize}
 \item Type classes create dictionaries which are implemented as tuples of functions.
