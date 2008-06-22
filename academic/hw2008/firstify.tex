@@ -214,14 +214,14 @@ We proceed by first giving a brief flavour of how these transformations may be u
 
 \subsection{Simplification}
 
-Simplification serves to group several simple transformations that most optimising compilers apply. Some of these steps have the ability to remove functional values; others simply ensure a normal form for future transformations. \todo{cite where all these rules can be found, remove individual citations}
+Simplification serves to group several simple transformations that most optimising compilers apply. Some of these steps have the ability to remove functional values; others simply ensure a normal form for future transformations. All the rules given in \S\ref{sec:simplification_detail}.
 
 \begin{example}
 \begin{code}
 one = (\x -> x) 1
 \end{code}
 
-\noindent The simplification rule (lam-app) from \S\ref{secB:core_simplify} transforms this function to:
+\noindent The simplification rule (lam-app) transforms this function to:
 
 \begin{code}
 one = let x = 1 in x
@@ -236,7 +236,7 @@ even =  let  one = 1
         in   \x -> not (odd x)
 \end{code}
 
-\noindent The simplification rule (let-lam) from \S\ref{sec:simplification_detail} lifts the lambda outside of the let expression.
+\noindent The simplification rule (let-lam) lifts the lambda outside of the let expression.
 
 \begin{code}
 even = \x ->  let  one = 1
@@ -283,7 +283,7 @@ main = case  (primEqInt, primNeqInt) of
              (a,b) -> a 1 2
 \end{code}
 
-\noindent The simplification stage can now turn the program into a first-order variant, using rule (case-con) from \S\ref{secB:core_simplify}.
+\noindent The simplification stage can now turn the program into a first-order variant, using rule simplification rule (case-con) from \S\ref{sec:simplification_detail}.
 
 \begin{code}
 main = primEqInt 1 2
