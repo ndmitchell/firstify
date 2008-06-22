@@ -638,11 +638,8 @@ The inlining transformation is specified by:
 
 \ignore\begin{code}
 case (f xs_) of alts_
-    => case (let vs_ = xs_ in y) alts_
-    where
-        vs_ = args f
-        y = body f
-        {-" \text{If } "-} isBox y {-" \text{ evaluates to } "-} True
+    => case (let {-"\ll"-} args f {-"\rr"-} = xs_ in {-"\ll"-} body f {-"\rr"-}) alts_
+    where isBox (f xs_) {-" \text{ evaluates to } "-} True
 \end{code}
 \end{definition}
 
