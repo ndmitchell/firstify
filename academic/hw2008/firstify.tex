@@ -1303,14 +1303,7 @@ While very few programs have residual functional values, a substantial number ma
 
 The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2. The longest execution time was just over one second, with the average time being half a second (see Time in Table \ref{tab:results}). The programs requiring most time made use of floating point numbers, suggesting that library code requires most effort to defunctionalise. If abstractions were given for library methods, the execution time would drop substantially.
 
-In order to gain acceptable speed, we perform a number of optimisations over the algorithm presented in \S\ref{sec:detailed}:
-
-\begin{itemize}
-\item We transform functions in an order determined by a topological sort with respect to the call-graph.
-\item We delay the transform of dictionary components, as these will often be eliminated.
-\item We fuse the inlining, arity raising and simplification stages.
-\item We track the arity and boxed lambda status of each function.
-\end{itemize}
+In order to gain acceptable speed, we perform a number of optimisations over the algorithm presented in \S\ref{sec:detailed}. (1) We transform functions in an order determined by a topological sort with respect to the call-graph. (2) We delay the transformation of dictionary components, as these will often be eliminated. (3) We fuse the inlining, arity raising and simplification stages. (4) We track the arity and boxed lambda status of each function.
 
 \subsection{Program Size}
 
