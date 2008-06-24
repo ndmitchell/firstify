@@ -1249,7 +1249,7 @@ We have tested all 14 programs from the imaginary section of the nofib suite, 35
 
 \subsection{Higher-Order Residues}
 
-All four programs curtailed by the termination bound are listed individually in the Table \ref{tab:results}. Of these programs, the lift program uses pretty-printing combinators, while the other three programs use parser combinators. In all programs, the combinators are used to build up a functional value which represents the action to perform, storing an unbounded amount of information inside the functional value, and therefore cannot be removed.
+All four programs curtailed by the termination bound are listed in Table \ref{tab:results}. The lift program uses pretty-printing combinators, while the other three programs use parser combinators. In all programs, the combinators are used to build up a functional value representing the action to perform, storing an unbounded amount of information inside the functional value, which therefore cannot be removed.
 
 The five programs that are not curtailed by the termination bound, but still contain residual higher-order expressions, are as follows:
 
@@ -1265,7 +1265,7 @@ This function is invoked with the IO monad, so the |return ()| expression is a f
 \end{example}
 
 \begin{example}
-\textit{The pretty, constraints and mkhprog programs} pass a functional value to an expression that evaluates to |undefined|. The case in \textit{pretty} comes from the fragment:
+\textit{The pretty, constraints and mkhprog programs} pass functional values to expressions that evaluate to $\bot$. The case in pretty comes from the fragment:
 
 \begin{comment}
 % for paper haskell
@@ -1281,7 +1281,7 @@ ppBesides :: [Pretty] -> Pretty
 ppBesides = foldr1 ppBeside
 \end{code}
 
-Here |ppBesides xs| evaluates to |undefined| if |xs == []|. The |undefined| value will be of type |Pretty|, and will be given further arguments, which can be functional arguments. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
+Here |ppBesides xs| evaluates to $\bot$ if |xs == []|. The $\bot$ value will be of type |Pretty|, and will be given further arguments, which can be functional arguments. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
 \end{example}
 
 \subsection{Termination Bound}
