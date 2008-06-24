@@ -1209,27 +1209,27 @@ Given an initial program, the arity raising, inlining and specialisation stages 
 
 \smallskip\smallskip
 
-\begin{tabular*}{\linewidth}{@@{}l@@{\!\!}rrrrrrrrr}
+\begin{tabular*}{\linewidth}{@@{}l@@{\extracolsep{\fill}}rrrrrrr@@{}}
 \textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Time} & \textbf{Size} \\
 \vspace{-1ex} \\
-bernouilli      & 4 & 240 & 0 & 190 & 2 & 0.4 & -32\% \\
-digits-of-e1    & 4 & 217 & 0 & 153 & 2 & 0.3 & -35\% \\
-digits-of-e2    & 5 & 236 & 0 & 198 & 3 & 0.4 & -32\% \\
-exp3\_8         & 4 & 232 & 0 & 154 & 2 & 0.3 & -39\% \\
-gen\_regexps    & 7 & 116 & 0 &  69 & 0 & 0.1 & -31\% \\
-integrate       & 4 & 348 & 0 & 358 & 2 & 0.8 & -38\% \\
-paraffins       & 4 & 360 & 0 & 351 & 2 & 0.7 & -53\% \\
-primes          & 4 & 217 & 0 & 148 & 2 & 0.2 & -38\% \\
-queens          & 4 & 217 & 0 & 146 & 2 & 0.3 & -38\% \\
-rfib            & 4 & 338 & 0 & 355 & 2 & 0.8 & -31\% \\
-tak             & 4 & 212 & 0 & 145 & 4 & 0.3 & -40\% \\
-wheel-sieve1    & 4 & 224 & 0 & 151 & 2 & 0.3 & -35\% \\
-wheel-sieve2    & 4 & 224 & 0 & 162 & 2 & 0.3 & -36\% \\
-x2n1            & 4 & 345 & 0 & 385 & 2 & 0.8 & -57\% \\
-& \multicolumn{8}{l} \;\;\;\;\;\;\;\ldots{}plus 35 tests from the spectral suite\ldots{} \\
-Minimum         & 2 & 60 & 0 & 46 & 0 & 0.1  & -78\% \\
-Maximum         & 14 & 437 & 1 & 449 & 100 & 1.0  & 15\% \\
-Average         & 4.8 & 237 & 0.06 & 202 & 3.6 & 0.4  & -33\% \\
+\multicolumn{8}{@@{}l}{\textbf{Examples curtailed by a termination bound}} \\
+cacheprof	 & 0	 & 611	 & 44	 & 686	 & 40  & 1.8	 & 2\% \\
+grep	 & 0	 & 129	 & 9	 & 108	 & 22	 & 0.8  & 40\% \\
+lift	 & 0	 & 187	 & 249	 & 175	 & 125  & 1.2	 & -6\% \\
+prolog	 & 0	 & 308	 & 385	 & 203	 & 137	 & 1.1  & -5\% \\
+\vspace{-1ex} \\
+\multicolumn{8}{@@{}l}{\textbf{All other examples}} \\
+ansi	 & 4	 & 239	 & 0	 & 187	 & 2   & 0.5	 & -29\% \\
+bernouilli	 & 4	 & 240	 & 0	 & 190	 & 2  & 0.3	 & -32\% \\
+bspt	 & 4	 & 262	 & 0	 & 264	 & 1	 & 0.7  & -22\% \\
+ & \multicolumn{7}{c}{$\ldots{}$ plus 56 additional examples $\ldots{}$} \\
+sphere &	4	 & 343	 & 0	 & 366	 & 2  & 0.7	 & -45\% \\
+symalg & 	5	 & 402	 & 0	 & 453	 & 64  & 1.0	 & -32\% \\
+x2n1	& 4 & 	345	 & 0	 & 385	 & 2  & 0.8	 & -57\% \\
+\vspace{-1ex} \\
+Minimum         & 2 & 60   & 0 & 46 &  0 & 0.1  & -78\% \\
+Maximum         & 14 & 580 & 1 & 581 & 100 & 1.2  & 27\% \\
+Average         & 5 & 260  & 0 & 232 & 5 & 0.5  & -30\% \\
 \hline
 \end{tabular*}
 \end{table}
