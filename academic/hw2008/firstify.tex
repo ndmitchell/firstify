@@ -72,7 +72,7 @@ primCatch :: alpha -> (IOError -> alpha) -> alpha
 \preprintfooter{}   % 'preprint' option specified.
 
 \title{Losing Functions without Gaining Data}
-\subtitle{ -- a new method for defunctionalisation}
+% \subtitle{ -- a new method for defunctionalisation}
 
 \authorinfo{Neil Mitchell\titlenote{The first author is supported by an EPSRC PhD studentship}}
            {University of York, UK}
@@ -236,8 +236,8 @@ one = (\x -> x) 1
 
 \begin{code}
 one = let x = 1 in x
-\end{code}
-\end{example}
+\end{code}\codeexample
+\end{example}\smallskip
 
 \noindent Other rules do not eliminate lambda expressions, but put them into a form that other stages can remove.
 
@@ -271,7 +271,7 @@ even = \x -> not (odd x)
 
 \begin{code}
 even x = not (odd x)
-\end{code}
+\end{code}\codeexample
 \end{example}
 
 
@@ -298,7 +298,7 @@ main = case  (primEqInt, primNeqInt) of
 
 \begin{code}
 main = primEqInt 1 2
-\end{code}
+\end{code}\codeexample
 \end{example}
 
 \subsection{Specialisation}
@@ -543,8 +543,8 @@ even = \x -> (.) (\y -> not y) (\z -> odd z) x
 
 \begin{code}
 even x = (.) (\y -> not y) (\z -> odd z) x
-\end{code}
-\end{example}
+\end{code}\codeexample
+\end{example}\smallskip
 
 This replaces partial application with lambda expressions, and has the advantage of making functional values more explicit, permitting arity raising.
 
@@ -580,8 +580,8 @@ The arity raising step is:
 \ignore\begin{code}
 function vs_ = \v -> x
     => function vs_ v = x
-\end{code}
-\end{definition}
+\end{code}\codeexample
+\end{definition}\bigskip
 
 Given a body which is a lambda expression, the arguments to the lambda expression can be lifted into the definition-level arguments for the function. If a function has its arity increased, fully-applied uses become partially-applied, causing the (eta) simplification rule to fire.
 
@@ -640,8 +640,8 @@ The inlining transformation is specified by:
 case (f xs_) of alts_
     => case (let {-"\ll"-} args f {-"\rr"-} = xs_ in {-"\ll"-} body f {-"\rr"-}) alts_
     where isBox (f xs_) {-" \text{ evaluates to } "-} True
-\end{code}
-\end{definition}
+\end{code}\codeexample
+\end{definition}\bigskip
 
 As with the simplification stage, there may be some loss of sharing if the definition being inlined has arity 0 -- a constant applicative form (CAF). A Haskell implementation computes these expressions only once, and reuses their value as necessary. If they are inlined, this sharing will be lost.
 
@@ -761,14 +761,12 @@ map_id v_1 =  let  f   = \x -> x
 
 \noindent After the simplification rules from Figure \ref{fig:lambda_simplify}, we obtain:
 
-\begin{onepage}
 \begin{code}
 map_id v_1 =  let  xs = v_1
               in   case  xs of
                          []    -> []
                          y:ys  -> y : map (\x -> x) ys
-\end{code}
-\end{onepage}
+\end{code}\codeexample
 \end{examplerevisit}
 
 \subsubsection{Using Templates}
@@ -784,7 +782,7 @@ map_id v_1 =  let  xs = v_1
                          y:ys  -> y : map_id ys
 \end{code}
 
-We now have a first-order definition.
+\noindent We now have a first-order definition.
 \end{exampleany}
 
 \subsection{Primitive Functions}
@@ -1057,19 +1055,19 @@ Our algorithm, as it stands, may not terminate. In order to ensure termination, 
 \label{sec:termination_simplification}
 
 \begin{figure}
-\bigskip
-\begin{verbatim}
-[x,y,z]
-app(lam(x),y)    -> let(y,x)
-app(case(x,y),z) -> case(x,app(y,z))
-app(let(x,y),z)  -> let(x,app(y,z))
-case(let(x,y),z) -> let(x,case(y,z))
-case(con(x),y)   -> let(x,y)
-case(x,lam(y))   -> lam(case(x,app(lam(y),var)))
-let(lam(x),y)    -> lam(let(x,y))
-\end{verbatim}
-\bigskip
-\caption{Encoding of termination simplification.}
+\textsf{
+\begin{tabular}{@@{}ll}
+[x,y,z] \\
+app(lam(x),y)    & $\rightarrow$ let(y,x) \\
+app(case(x,y),z) & $\rightarrow$ case(x,app(y,z)) \\
+app(let(x,y),z)  & $\rightarrow$ let(x,app(y,z)) \\
+case(let(x,y),z) & $\rightarrow$ let(x,case(y,z)) \\
+case(con(x),y)   & $\rightarrow$ let(x,y) \\
+case(x,lam(y))   & $\rightarrow$ lam(case(x,app(lam(y),var))) \\
+let(lam(x),y)    & $\rightarrow$ lam(let(x,y)) \\
+\end{tabular}
+}
+\caption{Encoding of simplification.}
 \label{fig:term_simplification}
 \end{figure}
 
@@ -1128,8 +1126,7 @@ The specialisation method, left unrestricted, also may not terminate.
 \begin{example}
 \label{ex:wrap}
 \begin{code}
-data Wrap a  =  Wrap (Wrap a)
-             |  Value a
+data Wrap alpha = Wrap (Wrap alpha) | Value alpha
 
 f x = f (Wrap x)
 main = f (Value head)
@@ -1139,12 +1136,13 @@ In the first iteration, the specialiser generates a version of |f| specialised f
 \end{example}
 
 \begin{figure}
-\[\frac{s \unlhd t_i \text{ for some } i}{s \unlhd \sigma(t_1,\ldots,t_n)} \]
-
-\[\frac{\sigma_1 \equiv \sigma_2,
+\begin{equation*}
+\frac{s \unlhd t_i \text{ for some } i}{s \unlhd \sigma(t_1,\ldots,t_n)}
+\;\;\;\;\;\;\;\;\;\;\;
+\frac{\sigma_1 \equiv \sigma_2,
         s_1 \unlhd t_1, \ldots , s_n \unlhd t_n}
-       {\sigma_1 (s_1,\ldots,s_n) \unlhd \sigma_2 (t_1,\ldots,t_n)} \]
-
+       {\sigma_1 (s_1,\ldots,s_n) \unlhd \sigma_2 (t_1,\ldots,t_n)}
+\end{equation*}
 \caption{Homeomorphic embedding relation.}
 \label{fig:homeomorphic}
 \end{figure}
@@ -1178,8 +1176,8 @@ Note that the recursive call to |f| has also been specialised. We now attempt to
 \begin{code}
 f' y = fst' y y
 fst' y_1 y_2 = y_2
-\end{code}
-\end{example}
+\end{code}\codeexample
+\end{example}\smallskip
 
 This example may look slightly obscure, but similar situations occur commonly with the standard translation of dictionaries. Often, classes have default methods, which call other methods in the same class. These recursive class calls often pass dictionaries, embedding the original caller even though no recursion actually happens.
 
@@ -1243,7 +1241,7 @@ We have tested our method with programs drawn from the nofib benchmark suite \ci
 \item The monadic bind operation is higher-order.
 \item The IO data type is implemented as a function.
 \item The Haskell |Show| type class uses continuation-passing style extensively.
-\item List comprehensions in Yhc are desugared to continuations. There are other translations which require less functional value manipulations \cite{wadler:list_comprehensions,coutts:stream_fusion}.
+\item List comprehensions in Yhc are desugared to continuations. There are other translations which require less functional value manipulations \cite{coutts:stream_fusion}.
 \end{itemize}
 
 We have tested all 14 programs from the imaginary section (each represented in the table), and 35 out of the 47 tests in the spectral section. The remaining 12 programs in the spectral section do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. After applying our defunctionalisation method, only 3 programs remain higher-order. We first discuss the residual higher-order programs, then make some observations about each of the columns in the table.
@@ -1300,7 +1298,7 @@ While very few programs have residual functional values, a substantial number ma
 \subsection{Execution Time}
 \label{sec:time}
 
-The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2 \cite{ghc}. The longest execution time was only one second, with the average time under half a second (see Time in Table \ref{tab:results}). The programs requiring most time made use of floating point numbers, suggesting that library code requires most effort to defunctionalise. If abstractions were given for library methods, the execution time would drop substantially.
+The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2. The longest execution time was only one second, with the average time under half a second (see Time in Table \ref{tab:results}). The programs requiring most time made use of floating point numbers, suggesting that library code requires most effort to defunctionalise. If abstractions were given for library methods, the execution time would drop substantially.
 
 In order to gain acceptable speed, we perform a number of optimisations over the algorithm presented in \S\ref{sec:detailed}:
 
@@ -1384,6 +1382,7 @@ Many analysis methods, in fields such as strictness analysis and termination ana
 
 
 \bibliographystyle{plainnat}
+\small
 \bibliography
 
 \end{document}
