@@ -43,9 +43,9 @@ instance UniqueId S where
 -- First lambda lift (only top-level functions).
 -- Then perform the step until you have first-order.
 mitchell :: Core -> Core
-mitchell c = fromCoreFuncMap c2 res
+mitchell c = res
     where
-        res = evalState (liftM toCoreFuncMap (uniqueBoundVarsCore c2) >>= step) (s0 :: S)
+        res = evalState (uniqueBoundVarsCore c2 >>= step) (s0 :: S)
         s0 = S (emptyTerminate True) BiMap.empty Map.empty c2 0 (uniqueFuncsNext c2)
         c2 = ensureInvariants [NoRecursiveLet,NoCorePos] c
 
@@ -54,8 +54,8 @@ mitchell c = fromCoreFuncMap c2 res
 -- and let's that appear to be bound to an unsaturated
 --
 -- Then specialise each value
-step :: CoreFuncMap -> SS CoreFuncMap
-step = f acts
+step :: Core -> SS Core
+step c = liftM (fromCoreFuncMap c) $ f acts (toCoreFuncMap c)
     where
         (*) = (,)
         acts = ["lambdas" * lambdas, "simplify" * simplify, "inline" * inline, "specialise" * specialise]
