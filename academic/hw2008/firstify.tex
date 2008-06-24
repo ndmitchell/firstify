@@ -1212,21 +1212,22 @@ Given an initial program, the arity raising, inlining and specialisation stages 
 \begin{tabular*}{\linewidth}{@@{}l@@{\extracolsep{\fill}}rrrrrrr@@{}}
 \textbf{Name} & \textbf{Bound} & \multicolumn{2}{c}{\textbf{HO Create}} & \multicolumn{2}{c}{\textbf{HO Use}} & \textbf{Time} & \textbf{Size} \\
 \vspace{-1ex} \\
-\multicolumn{8}{@@{}l}{\textbf{Examples curtailed by a termination bound}} \\
-cacheprof	 & 0	 & 611	 & 44	 & 686	 & 40  & 1.8	 & 2\% \\
-grep	 & 0	 & 129	 & 9	 & 108	 & 22	 & 0.8  & 40\% \\
-lift	 & 0	 & 187	 & 249	 & 175	 & 125  & 1.2	 & -6\% \\
-prolog	 & 0	 & 308	 & 385	 & 203	 & 137	 & 1.1  & -5\% \\
+\multicolumn{8}{@@{}l}{Programs curtailed by a termination bound:} \\
+cacheprof	 & 8	 & 611	 & 44	 & 686	 & 40  & 1.8	 & 2\% \\
+grep	 & 8	 & 129	 & 9	 & 108	 & 22	 & 0.8  & 40\% \\
+lift	 & 8	 & 187	 & 123	 & 175	 & 125  & 1.2	 & -6\% \\
+prolog	 & 8	 & 308	 & 301	 & 203	 & 137	 & 1.1  & -5\% \\
 \vspace{-1ex} \\
-\multicolumn{8}{@@{}l}{\textbf{All other examples}} \\
+\multicolumn{8}{@@{}l}{All other programs:} \\
 ansi	 & 4	 & 239	 & 0	 & 187	 & 2   & 0.5	 & -29\% \\
 bernouilli	 & 4	 & 240	 & 0	 & 190	 & 2  & 0.3	 & -32\% \\
 bspt	 & 4	 & 262	 & 0	 & 264	 & 1	 & 0.7  & -22\% \\
- & \multicolumn{7}{c}{$\ldots{}$ plus 56 additional examples $\ldots{}$} \\
+ & \multicolumn{7}{c}{$\ldots{}$ plus 56 additional programs $\ldots{}$} \\
 sphere &	4	 & 343	 & 0	 & 366	 & 2  & 0.7	 & -45\% \\
 symalg & 	5	 & 402	 & 0	 & 453	 & 64  & 1.0	 & -32\% \\
 x2n1	& 4 & 	345	 & 0	 & 385	 & 2  & 0.8	 & -57\% \\
 \vspace{-1ex} \\
+\multicolumn{8}{@@{}l}{Summary of all other programs:} \\
 Minimum         & 2 & 60   & 0 & 46 &  0 & 0.1  & -78\% \\
 Maximum         & 14 & 580 & 1 & 581 & 100 & 1.2  & 27\% \\
 Average         & 5 & 260  & 0 & 232 & 5 & 0.5  & -30\% \\
