@@ -181,18 +181,17 @@ The sections following begin with a definition of our Core language (\S\ref{sec:
 
 \begin{figure}
 \ignore\begin{code}
-data Expr  =  ELam v x               {-"\text{\hspace{1cm}lambda abstraction}"-}
-           |  EFun f xs_             {-"\text{\hspace{1cm}function application}"-}
-           |  ECon c xs_             {-"\text{\hspace{1cm}constructor application}"-}
-           |  EApp x xs_             {-"\text{\hspace{1cm}general application}"-}
-           |  EVar v                 {-"\text{\hspace{1cm}variable}"-}
-           |  ELet v x y             {-"\text{\hspace{1cm}non-recursive let expression}"-}
-           |  ECase x alts_          {-"\text{\hspace{1cm}case expression}"-}
+expr  :=  \v -> x           {-"\text{\hspace{1cm}lambda abstraction}"-}
+      |   f xs_             {-"\text{\hspace{1cm}function application}"-}
+      |   c xs_             {-"\text{\hspace{1cm}constructor application}"-}
+      |   x xs_             {-"\text{\hspace{1cm}general application}"-}
+      |   v                 {-"\text{\hspace{1cm}variable}"-}
+      |   let v = x in y    {-"\text{\hspace{1cm}non-recursive let expression}"-}
+      |   case x of alts_   {-"\text{\hspace{1cm}case expression}"-}
 
-data Alt   =  EAlt c vs_ x           {-"\text{\hspace{1cm}case alternative}"-}
+alt   := c -> vs_ x         {-"\text{\hspace{1cm}case alternative}"-}
 \end{code}
 \begin{code}
-arityExpr :: Expr -> Int
 arityExpr (ELam v x) = 1 + arityExpr x
 arityExpr _ = 0
 \end{code}
@@ -559,7 +558,7 @@ The inlining transformation is specified by:
 
 \ignore\begin{code}
 case (f xs_) of alts_
-    => case (y xs_) alts_
+    => case (y xs_) of alts_
     where
         y = body f
         {-" \text{If } "-} isBox (f xs_) {-" \text{ evaluates to } "-} True
@@ -639,7 +638,7 @@ abstractVars vs x = ellipses
 \subsubsection{Generating Templates}
 \label{sec:need_templates}
 
-The idea is to generate templates for all function calls which pass functional values. Given a expression |x| a template is generated if: (1) |x| is a function application; and (2) at least one of the sub-expressions of |x| is either a lambda or a boxed lambda (see \S\ref{sec:inlining}). In all cases, the template generate is simply |x|.
+The idea is to generate templates for all function calls which pass functional values. Given a expression |x| a template is generated if: (1) |x| is a function application; and (2) at least one of the sub-expressions of |x| is either a lambda or a boxed lambda (see \S\ref{sec:inlining}). In all cases, the template generated is simply |x|.
 
 \begin{example}
 The following expressions generate templates:
@@ -660,7 +659,7 @@ We perform abstraction to reduce the number of different templates required, by 
 
 \begin{enumerate}
 \item |e| is not, and does not contain, any expressions which are either lambda expressions or boxed lambdas, e.g. we cannot replace |(\x -> x)| or |(let y = \x -> x in y)| with |hole|.
-\item None of the free variables in |e| are bound in the template, e.g. we cannot replace the expression |v| in |let v = 1 in v| with |hole|, as the variable |v| is bound within the template.
+\item None of the free variables in |e| are bound in the template, e.g. we cannot replace the expression |f v| in |let v = 1 in f v| with |hole|, as the variable |v| is bound within the template.
 \end{enumerate}
 
 \begin{example}
@@ -691,10 +690,10 @@ map_id = \v_1 -> map (\x -> x) v_1
 \noindent We unfold the definition of |map| once:
 
 \begin{code}
-map_id = \v_1 -> (\f xs -> case  xs of
-                                 []    -> []
-                                 y:ys  -> f y : map f ys) (\x -> x) v_1
-
+map_id = \v_1 ->  (\f xs -> case  xs of
+                                  []    -> []
+                                  y:ys  -> f y : map f ys)
+                  (\x -> x) v_1
 \end{code}
 
 \noindent After the simplification rules from Figure \ref{fig:lambda_simplify}, we obtain:
@@ -727,7 +726,7 @@ map_id = \v_1 ->  let  xs = v_1
 
 The transformations we have presented are not confluent. Consider the expression |id ((\x -> x) 1)|. We can either apply specialisation, or the (lam-app) rule. The first will involve the creation of an additional function definition, while the second will not.
 
-We conjecture that the rules in each of the separate categories are confluent. In order to ensure a deterministic application of the rules we always favour rules first from the simplification stage, then the inlining stage, and finally the specialisation stage. Doing so will in some cases lead to a superior result being produced.
+We conjecture that the rules in each of the separate categories are confluent. In order to ensure a deterministic application of the rules we always favour rules first from the simplification stage, then the inlining stage, and finally the specialisation stage. Doing so will in some cases lead to a superior result being produced. \todo{superior result?}
 
 \subsection{Primitive Functions}
 \label{sec:primitives}
@@ -743,7 +742,7 @@ These restrictions mean that some programs using primitive functions cannot be m
 
 \begin{example}
 \begin{code}
-main = (\x -> x) `seq` 42
+main = seq (\x -> x) 42
 \end{code}
 
 Here a functional value is passed as the first argument to the primitive |seq|. As we are not able to peer inside the primitive, and must preserve its interface, we cannot remove this functional value. For most primitives, such as arithmetic operations, the types ensure that no functional values are passed as arguments. However, the |seq| primitive is of type \ignore|alpha -> beta -> beta|, allowing any type to be passed as either of the arguments, including functional values.
@@ -968,23 +967,21 @@ Our algorithm, as it stands, may not terminate. In order to ensure termination, 
 \label{sec:termination_simplification}
 
 \begin{figure}
-\bigskip
-\begin{verbatim}
-[x,y,z]
-app(lam(x),y)    -> let(y,x)
-app(case(x,y),z) -> case(x,app(y,z))
-app(let(x,y),z)  -> let(x,app(y,z))
-case(let(x,y),z) -> let(x,case(y,z))
-case(con(x),y)   -> let(x,y)
-case(x,lam(y))   -> lam(case(x,app(lam(y),var)))
-let(lam(x),y)    -> lam(let(x,y))
-\end{verbatim}
-\bigskip
+\textsf{\noindent\begin{tabular}{@@{}l@@{}l}
+[x,y,z]                                          \\
+app(lam(x),y)    & |->| let(y,x)                     \\
+app(case(x,y),z) & |->| case(x,app(y,z))             \\
+app(let(x,y),z)  & |->| let(x,app(y,z))              \\
+case(let(x,y),z) & |->| let(x,case(y,z))             \\
+case(con(x),y)   & |->| let(x,y)                     \\
+case(x,lam(y))   & |->| lam(case(x,app(lam(y),var))) \\
+let(lam(x),y)    & |->| lam(let(x,y))                \\
+\end{tabular}}
 \caption{Encoding of termination simplification.}
 \label{fig:term_simplification}
 \end{figure}
 
-In order to check the termination of the simplifier we have used the AProVE system \cite{aprove} to model our rules as a \textit{term rewriting system}, and check its termination. An encoding of a simplified version of the rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} is given in Figure \ref{fig:term_simplification}. We have encoded rules by considering what type of expression is transformed by a rule. For example, the rule replacing |(\v -> x) y| with |let v = y in x| is expressed as a rewrite replacing \ignore|app(lam(x),y)| with \ignore|let(y,x)|. The names of binding variables with expressions have been ignored. To simplify the encoding, we have only considered applications with one argument. The rules are applied non-deterministically at any suitable location, so faithfully model the behaviour of the original rules.
+In order to check the termination of the simplifier we have used the AProVE system \cite{aprove} to model our rules as a \textit{term rewriting system}, and check its termination. An encoding of a simplified version of the rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} is given in Figure \ref{fig:term_simplification}. We have encoded rules by considering what type of expression is transformed by a rule. For example, the rule replacing |(\v -> x) y| with |let v = y in x| is expressed as a rewrite replacing \textsf{app(lam(x),y)} with \textsf{let(y,x)}. The names of binding variables with expressions have been ignored. To simplify the encoding, we have only considered applications with one argument. The rules are applied non-deterministically at any suitable location, so faithfully model the behaviour of the original rules.
 
 The encoding of the (bind-box) and (bind-lam) rules is excluded. Given these rules, there are non terminating sequences. For example:
 
@@ -996,7 +993,7 @@ let x = \x -> x x in x x
 (\x -> x x) (\x -> x x)
 \end{code}
 
-Such expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} are able to make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. This limited is intended to give a strong guarantee of termination, and will only be necessary rarely -- hence the high bound.
+Such expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. This limited is intended to give a strong guarantee of termination, and will only be necessary rarely -- hence the high bound.
 
 \subsection{Termination of Inlining}
 
@@ -1056,6 +1053,8 @@ In the first iteration, the specialiser generates a version of |f| specialised f
 \label{fig:homeomorphic}
 \end{figure}
 
+\todo{copy updates from detlef in thesis}
+
 To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
 For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
@@ -1095,6 +1094,8 @@ To alleviate this problem, instead of storing one set $S$, we store a sequence o
 By default our defunctionalisation program uses 8 sets. In the results table given in \S\ref{sec:results}, we have given the minimum possible value of $n$ to remove all lambda expressions within each program.
 
 \subsection{Termination as a Whole}
+
+\todo{rewrite subsection with new meanings}
 
 Given an initial program, inlining and specialisation stages will each apply a finite number of times. The simplification stage is terminating on its own, and will be invoked a finite number of times, so will also terminate. Therefore, when combined, the stages will terminate.
 
@@ -1154,6 +1155,8 @@ We have tested our method with programs drawn from the nofib benchmark suite \ci
 \item List comprehensions in Yhc are desugared to continuation-passing style. There are other translations which require less functional value manipulations \cite{coutts:stream_fusion}.
 \end{itemize}
 
+\todo{move to the new definition of first-order}
+
 We have tested all 14 programs from the imaginary section of the nofib suite, 35 of the 47 spectral programs, and 17 of the 30 real programs. The remaining 25 programs do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. Upon applying our defunctionalisation method, 4 programs are curtailed by the termination bound, and 5 additional programs remain higher-order. We first discuss the residual higher-order programs, then make some observations about each of the columns in the table.
 
 \subsection{Higher-Order Residues}
@@ -1192,6 +1195,8 @@ ppBesides = foldr1 ppBeside
 
 Here |ppBesides xs| evaluates to $\bot$ if |xs == []|. The $\bot$ value will be of type |Pretty|, and will be given further arguments, which can be functional arguments. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
 \end{example}
+
+\todo{move stuff from uses of functional values}
 
 \subsection{Termination Bound}
 
