@@ -17,6 +17,7 @@
 
 %format let_ = "\mathsf{let}"
 %format case_ = "\mathsf{case}"
+%format bot = "\bot{}"
 
 %format (ELam a (b)) = "\ll{}" \a -> b "\rr{}"
 %format (EFun a b) = "\ll{}" a \? b "\rr{}"
@@ -42,10 +43,15 @@
      \noindent\textbf{Definition:}}
     {\noexample}
 
+\newenvironment{lemma}[1]
+    {\smallskip
+     \noindent\textbf{Lemma:} \textit{#1}}
+    {\noexample}
+
 \hsdef{\begin{comment}
 Show
 f,x,y,g,v,e,s_0,l',b',n,l_n,s,l_n',xs,b_n',e_n,e_6
-lp,p,bp,l
+lp,p,bp,l,b,xs_
 app,lam,fun,con
 \end{comment}}
 \begin{comment}
@@ -75,6 +81,7 @@ primCatch :: alpha -> (IOError -> alpha) -> alpha
 apply :: a
 ellipses :: a
 hole :: a
+bottom :: a
 
 type VarName   = String
 freeVars :: Expr -> [VarName]
@@ -208,7 +215,7 @@ The variable, case, application and lambda expressions are much as they would be
 Informally, if a program creates functional values at runtime it is higher-order, otherwise it is first-order. Functional values can only be created in two ways: (1) a lambda expression that does not contribute to the arity of its enclosing function; or (2) a partially-applied function application. We therefore make the following definition:
 
 \begin{definition}
-A program is higher-order if it creates or uses functional values. A program creates a functional value if there are any partially-applied functions, or lambda expressions which do not contribute to the arity of a top-level function. A program uses a functional value if there are any over-applied functions or general application expressions.
+A program is \textit{higher-order} if it contains expressions which create or use functional values. An expression creates a functional value if it is a partially-applied function or a lambda expression which does not contribute to the arity of a top-level function. An expression uses a functional value if it is an over-applied functions or a general application.
 \end{definition}
 
 \begin{examplerevisit}{\ref{ex:incList}}
@@ -796,163 +803,106 @@ We have benchmarked these operations in a variety of settings and the list based
 \section{Restricted Completeness}
 \label{sec:completeness}
 
-Our method would be \textit{complete} if it removed all lambda expressions and partially-applied functions from a program. All partially-applied functions are translated to lambda expressions using the (eta) rule. We therefore need to determine where a lambda expression may occur in a program after the application of our defunctionalisation method.
+Our method would be \textit{complete} if it made all programs to first-order. In this section we give some results about where expressions creating functional values can remain in a resulting program.
 
-\subsection{Notation}
+\subsection{Proposition}
 
-To examine where lambda expressions may occur, we model expressions in our Core language as a set of \textit{syntax trees}. We define the following rules, which generate sets of expressions:
-
-\ignore\begin{code}
-lam x      = {\v' -> x' | v' `elem` v, x' `elem` x}
-fun x y    = {f' ys_' | f' `elem` f, x' `elem` x, ys_' `elem_` y, body f' == x'}
-con x      = {c' xs_' | xs_' `elem_` x}
-app x y    = {x' ys_' | x' `elem` x, ys_' `elem_` y}
-var        = {v' | v' `elem` v}
-let_ x y   = {let v' = x' in y' | x' `elem` x, y' `elem` y}
-case_ x y  = {case  x' of alts_' | x' `elem` x,
-                    alts_' `elem_` {c' vs_' -> y' | c' `elem` c, vs_' `elem_` v, y' `elem` y}}
-\end{code}
-
-Here |v| is the set of all variables, |f| the set of function names, and |c| the set of constructors. We use \ignore|xs_ `elem_` e| to denote that |xs_| is a sequence of any length, whose elements are drawn from |e|. In the definition of \ignore|fun x y|, the expression set |x| represents the possible bodies of the function, while |y| represents the arguments. We can now define an upper bound on the set of unrestricted expressions in our Core language as the smallest solution to the equation |s_0|:
-
-% _ = L f C a v c l
-\ignore\begin{code}
-s_0  =  lam s_0 &+ fun s_0 s_0 &+ con s_0 &+ app s_0 s_0 &+ var &+
-        case_ s_0 s_0 &+ let_ s_0 s_0
-\end{code}
-
-\subsection{A Proposition about Residual Lambdas}
-
-We classify the location of lambdas within the residual program, assuming the following two conditions are satisfied:
+After transformation, there will be no instances of partial application, and all lambda expressions will be unreachable (never be evaluated at runtime), provided:
 
 \begin{enumerate}
 \item The termination criteria do not curtail defunctionalisation (see \S\ref{sec:termination}).
-\item No primitive function receives a functional argument, or returns a functional result.
+\item No primitive function receives a functional value, or returns a functional value.
+\item The main function has a type that ensures it neither receives a functional argument, nor returns a functional result.
 \end{enumerate}
 
-Given these assumptions, a lambda or boxed lambda may only occur in the following places: (1) the body of the |main| function; (2) passed as an argument to a variable of functional type; (3) the body of a lambda expression. In \S\ref{sec:example_residual} we give examples of these residual forms.
+We prove this proposition with a series of lemmas about the resultant program.
 
-\subsection{Proof of the Proposition}
+\subsection{Consequences}
 
-\todo{redo this section}
-
-First we show that residual definition bodies belong to a proper subset of |s_0|, by defining successively smaller subsets, where \ignore|s_n `supset` s{-"_{\mathsf{n}\text{\tiny{+}}1}"-}|. Secondly we describe which expressions may be the \textit{parents} of residual lambda expressions, using our refined set of possible expressions.
-
-\paragraph{Restriction 1: Type Safety}
-We know our original program is type safe. Each of our stages preserves semantics, and therefore type safety. So the scrutinee of a case cannot be a functional value. Also, all constructor expressions are saturated, so they must evaluate to a data value, and cannot be applied to arguments. Refining our bounding set to take account of these observations, we have:
-
-% _ = L f C a(!C, _) v c(!L, _) l
-\ignore\begin{code}
-s_1  =  lam s_1 &+ fun s_1 s_1 &+ con s_1 &+ app (s_1 - con s_1) s_1 &+ var &+
-        case_ (s_1 - lam s_1) s_1 &+ let_ s_1 s_1
-\end{code}
-
-\paragraph{Restriction 2: Standard Simplification Rules}
-Our simplification rules given in Figure \ref{fig:simplify} are applied until a fixed point is found, meaning that no expression matching the left-hand side of a rule can occur in the output. For example, the left-hand side of the (case-con) rule is \ignore|case_ (con s) s|, so this pattern cannot remain in a residual program. By similarly examining left-hand sides of all the standard simplification rules we can further reduce the bounding set of residual expressions:
-
-% _ = L f C a(v, _) v c(f a v, _) l
-\ignore\begin{code}
-s_2  =  lam s_2 &+ fun s_2 s_2 &+ con s_2 &+ app var s_2 &+ var &+
-        case_ (fun s_2 s_2 &+ app var s_2 &+ var) s_2 &+ let_ s_2 s_2
-\end{code}
-
-\paragraph{Restriction 3: Lambda Simplification Rules}
-We apply the lambda rules from Figure \ref{fig:lambda_simplify}. As \ignore|(e - lam e)| occurs repeatedly we have factored it out as |l'|. To allow reuse of |l'| in future definitions, we parameterise by |n| to obtain |l_n'|.
-
-% _ = L f C a(v, _) v c(f a v, !L) l(!L, !L)
-\ignore\begin{code}
-s_3   =  e_3
-e_3   =  lam e_3 &+ fun e_3 e_3 &+ con e_3 &+ app var e_3 &+ var &+
-         case_(fun e_3 e_3 &+ app var e_3 &+ var) l_3' &+ let_ l_3' l_3'
-l_n'  =  e_n - lam e_n
-\end{code}
-
-\paragraph{Restriction 4: Arity Raising}
-Arity raising guarantees that no function body is a lambda expression.
-
-\todo{no longer true}
-
-% _ = L f(!L, _) C a(v, _) v c(f a v, !L) l(!L, !L)
-\ignore\begin{code}
-s_4   =  l_4'
-e_4   =  lam e_4 &+ fun l_4' e_4 &+ con e_4 &+ app var e_4 &+ var &+
-         case_ (fun l_4' e_4 &+ app var e_4 &+ var) l_4' &+ let_ l_4' l_4'
-\end{code}
-
-\paragraph{Restriction 5: Inlining and (bind-box)}
-To deal with inlining, we need to work with lambda boxes, as defined by the function |isBox|, from Figure \ref{fig:boxed_lambda}. We define |b_n'| to be the expressions with children drawn from |e_n| which are \textit{not} lambda boxes:
+The above proposition means that replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. Another way of viewing this proposition is that after transformation the program will be first-order at runtime, even if there are some higher-order features present in the source program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Therefore, given the above restrictions, the following rewrites are valid:
 
 \ignore\begin{code}
-b_n'  =  lam e_n &+ fun b_n' e_n &+ con (b_n' - lam e_n) &+ app e_n e_n &+ var &+
-         case_ e_n b_n' &+ let_ e_n b_n'
+(\v -> x)  => bot
+x xs_      => bot
+f xs_      => bot    {-"\hspace{1cm}"-} if arity f /= length xs_
 \end{code}
 
-As an example of how the component subsets of |b_n'| are obtained, take |fun b_n' e_n|. A function application is a lambda box if the function's body is a lambda box. Therefore, provided the body of the function is not a lambda box, the function application will not be. The arguments to a function application do not affect whether the application is a lambda box, and are left unrestricted as |e_n|.
+After performing these rewrites, the program is guaranteed to be first-order.
 
-The inlining stage and the (bind-box) simplification rule match expressions which are lambda boxes, therefore these expressions can be eliminated from the residual program:
+\subsection{Lemmas}
 
-\ignore\begin{code}
-s_5   =  l_5'
-e_5   =  lam e_5 &+ fun l_5' e_5 &+ con e_5 &+ app var e_5 &+ var &+
-         case_ (fun (l_5' &* b_5') e_5 &+ app var e_5 &+ var) l_5' &+
-         let_ (l_5' &* b_5') l_5'
+\begin{lemma}{No partial application}
+
+The (eta) rule removes partial application, and at the end of transformation, no further rules apply -- therefore there can be no partial application in the resultant program.
+\end{lemma}
+
+\begin{lemma}{The first argument of a general application must be a local variable}
+
+The rules (app-app), (fun-app), (lam-app), (let-app) and (case-app) mean the first argument to a general application must be a variable of a constructor application. All constructor applications are fully applied, and therefore cannot return a function, so type safety ensures they cannot be the first argument of an application. Therefore, the first argument of an application is a local variable.
+\end{lemma}
+
+\begin{lemma}{The direct parent of a lambda expression must be one of: the root of a function definition; an argument to an application; a lambda expression; an argument to a constructor}
+
+A lambda cannot be the scrutinee in a case expression as it would not be well typed. A lambda cannot be an argument to a function as it would be removed by specialisation. All other possible lambda positions are removed by the rules (lam-app), (case-lam), (bind-lam) and (let-lam).
+\end{lemma}
+
+\begin{lemma}{The outer parent of a boxed lambda must be one of: the root of a function definition; an argument to an application; a lambda expression}
+
+For the outer parent of a boxed lambda we refer to an expression which is not itself a boxed lambda, but contains a boxed lambda as an immediate subexpression. Using the definition of |isBox| from Figure \ref{fig:boxed_lambda} we restrict the outer parent of a boxed lambda to the binding of a let, the scrutinee of a case, and argument to a function or one of the locations mentioned in the lemma. We remove the binding of a let with (bind-box) and the argument to a function with specialise.
+
+To remove a boxed lambda from a case scrutinee we observe that a boxed lambda must be a constructor application, a let expression, a case expression or a function application. The first three are removed with the rules (case-con), (case-let) and (case-case). The function application based boxed lambda is removed with inlining.
+\end{lemma}
+
+\begin{lemma}{A boxed lambda must have a type that may contain a functional value}
+
+The base case of a boxed lambda is a constructor application to a lambda, which trivially contains a lambda. For let and case, the type of the expression is the type of the inner boxed lambda. The remaining case is if |((\vs_ -> b) xs_)| is able to contain a functional value. As |b| must be a boxed lambda, i.e. a constructor wrapping a lambda, any application and abstraction operations alone cannot examine the constructor, so cannot remove the functional type.
+\end{lemma}
+
+\begin{lemma}{A function whose root is a boxed lambda must be called from the argument of an application or inside a lambda}
+
+An application of a function whose root is a boxed lambda is itself a boxed lambda, therefore the restrictions on where a boxed lambda can reside apply to function applications whose root is a boxed lambda.
+\end{lemma}
+
+\begin{lemma}{All lambda expressions are unreachable}
+
+The |main| function cannot be a boxed lambda, as that would be a functional value, and is disallowed by restrictions on |main|. There remain only two possible locations for lambda expressions or boxed lambdas:
+
+\h{exprlist}\begin{code}
+v (\w -> ellipses)
+\v -> (\w -> ellipses)
 \end{code}
 
-\paragraph{Restriction 6: Specialisation}
-As specialisation removes all lambdas and boxed lambdas from the arguments of function applications we define:
+Neither of these constructs binds a lambda expression to a value, therefore in the first case |v| cannot be bound to a lambda. If |v| is not a lambda, then type checking means that |v| \textit{must} be the value $\bot{}$, and therefore the lambda will never be evaluated. In the second case, the lambda must be contained with a lambda, which itself must be either in a lambda or a general application -- and again will not be evaluated.
+\end{lemma}
 
-\ignore\begin{code}
-s_6  =  l_6'
-e_6  =  lam e_6 &+ fun l_6' (l_6' &* b_6') &+ con e_6 &+ app var e_6 &+ var &+
-        case_ (fun (l_6' &* b_6') (l_6' &* b_6') &+ app var e_6 &+ var) l_6' &+
-        let_ (l_6' &* b_6') l_6'
-\end{code}
+\begin{lemma}{There is no partial application and all lambda expressions are unreachable}
 
-\paragraph{Residual Forms}
-Having applied all the rules, we now classify what the parent expressions of a lambda may be. Since |l_n'| by definition excludes lambda expressions, no residual function body can be a lambda. We can define |lp|, the lambda parents, consisting of the expressions drawn from |e_6| which permit a lambda expression as a direct child. We have denoted the possible presence of a lambda with |l|, and their absence with an underscore:
+By combining the lemmas that there is no partial application and that all lambda expressions are unreachable.
+\end{lemma}
 
-\ignore\begin{code}
-lp = lam l &+ con l &+ app _ l
-\end{code}
-
-That is, a lambda may occur as the child of a lambda expression, as an argument to a constructor, or as an argument to an application. However, a constructor containing a lambda is a boxed lambda, and therefore is not permitted anywhere |b'| is intersected with the expression. Similarly to |lp|, we can define |bp|, the boxed parents, consisting of expressions drawn from |e_6| which permit a boxed lambda as a direct child:
-
-\ignore\begin{code}
-bp = lam b &+ fun b _ &+ con b &+ app _ b &+ case_ _ b &+ let_ _ b
-\end{code}
-
-Either the body of the |main| function is a boxed lambda, or a boxed lambda must have a parent expression which is not a boxed lambda. We can restate |bp| to exclude expressions which are themselves boxed lambdas, and determine the ultimate parent of a boxed lambda:
-
-\ignore\begin{code}
-bp = lam b &+ app _ b
-\end{code}
-
-The |con l| expression is itself a boxed lambda, and is only permitted where |bp| permits. Therefore, the ultimate parent of either a lambda or a boxed lambda can be expressed as:
-
-\ignore\begin{code}
-p = lam (b &+ l) &+ app _ (b &+ l)
-\end{code}
-
-In view of the restrictions imposed on |e_6|, we also know that the first argument of any general application must be a variable. So we have shown, as required, that a lambda or boxed lambda may only occur as the body of a lambda, passed as an argument to a variable in a general application, or as the body of the |main| function.
-
-\subsection{Example Residual Lambdas}
+\subsection{Residual Higher-Order Programs}
 \label{sec:example_residual}
 
-The most interesting residual lambdas occur as arguments in an application of a variable -- for example |v (\x -> x)|. In this example, the lambda |(\x -> x)| cannot be bound to the variable |v|. This leaves three possibilities: (1) either |v| is bound to $\bot{}$; or (2) |v| is never bound to anything; or (3) |v| is bound outside the program. For example:
+The following programs all remain higher-order after applying our method, although none will actually create higher-order values at runtime.
 
+\begin{example}
 \begin{code}
-bottom = bottom
-main_1 = bottom (\x -> x)
-
-nothing = Nothing
-main_2 = case  nothing of
-               Nothing  -> 1
-               Just f   -> f (\x -> x)
-
-main_3 f = f (\x -> x)
+main = bottom (\x -> x)
 \end{code}
 
-The residual lambda in |main_1| is a result of the non-termination of the |bottom| function, and the lambda in |main_2| is part of dead code. In both cases the lambda expression is never evaluated and no functional value is created at runtime. The final |main_3| example could be eliminated by requiring a first-order |main| function.
+We use the expression |bottom| to indicate a computation that evaluates to $\bot{}$ -- either a call to |error| or a non-termination. This program will evaluate to $\bot{}$, and will never evaluate the lambda expression.
+\end{example}
+
+\begin{example}
+\begin{code}
+nothing = Nothing
+main = case  nothing of
+             Nothing  -> 1
+             Just f   -> f (\x -> x)
+\end{code}
+
+In this example the lambda expression is never reached because that particular branch of the case expression is never taken.
+\end{example}
 
 \section{Proof of Termination}
 \label{sec:termination}
@@ -1053,9 +1003,7 @@ In the first iteration, the specialiser generates a version of |f| specialised f
 \label{fig:homeomorphic}
 \end{figure}
 
-\todo{copy updates from detlef in thesis}
-
-To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding $\unlhd$ is a well-binary relation, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
+To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding $\unlhd$ is a well-quasi order, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
 For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
 
@@ -1095,9 +1043,7 @@ By default our defunctionalisation program uses 8 sets. In the results table giv
 
 \subsection{Termination as a Whole}
 
-\todo{rewrite subsection with new meanings}
-
-Given an initial program, inlining and specialisation stages will each apply a finite number of times. The simplification stage is terminating on its own, and will be invoked a finite number of times, so will also terminate. Therefore, when combined, the stages will terminate.
+Given an initial program, inlining and specialisation rules will only apply a finite number of times. The simplification rules are terminating on their own, so when combined, all the rules will terminate.
 
 \section{Results}
 \label{sec:results}
@@ -1155,9 +1101,7 @@ We have tested our method with programs drawn from the nofib benchmark suite \ci
 \item List comprehensions in Yhc are desugared to continuation-passing style. There are other translations which require less functional value manipulations \cite{coutts:stream_fusion}.
 \end{itemize}
 
-\todo{move to the new definition of first-order}
-
-We have tested all 14 programs from the imaginary section of the nofib suite, 35 of the 47 spectral programs, and 17 of the 30 real programs. The remaining 25 programs do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. Upon applying our defunctionalisation method, 4 programs are curtailed by the termination bound, and 5 additional programs remain higher-order. We first discuss the residual higher-order programs, then make some observations about each of the columns in the table.
+We have tested all 14 programs from the imaginary section of the nofib suite, 35 of the 47 spectral programs, and 17 of the 30 real programs. The remaining 25 programs do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. Upon applying our defunctionalisation method, 4 programs are curtailed by the termination bound, and 5 additional programs contain expressions which create functional values. Following the proof in \S\ref{sec:completeness}, the remaining 57 programs are guaranteed not to create any functional values at runtime. We first discuss the residual programs containing the creation of functional values, then make some observations about each of the columns in the table.
 
 \subsection{Higher-Order Residues}
 
@@ -1195,8 +1139,6 @@ ppBesides = foldr1 ppBeside
 
 Here |ppBesides xs| evaluates to $\bot$ if |xs == []|. The $\bot$ value will be of type |Pretty|, and will be given further arguments, which can be functional arguments. In reality, the code ensures that the input list is never |[]|, so the program will never fail with this error.
 \end{example}
-
-\todo{move stuff from uses of functional values}
 
 \subsection{Termination Bound}
 
