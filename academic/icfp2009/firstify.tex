@@ -163,11 +163,12 @@ Our method has been implemented in Haskell \cite{haskell}, and operates over the
 Our paper makes the following contributions:
 
 \begin{itemize}
-\item We define a defunctionalisation method which, unlike some previous work, does not introduce new data types.
+\item We define a defunctionalisation method which, unlike some previous work, does not introduce new data types (\S\ref{sec:overview}, \S\ref{sec:detailed}).
 \item Our method can deal with the complexities of a language like Haskell, including type classes, programs using continuation-passing style and monads.
 \item Our method makes use of standard transformation steps, but combined in a novel way.
-\item We identify restrictions which guarantee termination, but are not overly limiting.
-\item We have implemented our method, and present measured results for much of the nofib benchmark suite.
+\item We classify where higher-order elements may remain in a resultant program (\S\ref{sec:completeness}).
+\item We identify restrictions which guarantee termination, but are not overly limiting (\S\ref{sec:termination}).
+\item We have implemented our method, and present measured results for much of the nofib benchmark suite (\S\ref{sec:results}).
 \end{itemize}
 
 \noindent There are a number of limitations to our approach, most importantly:
@@ -176,12 +177,6 @@ Our paper makes the following contributions:
 \item Our algorithm is not complete -- it \textit{does not} always succeed in removing all functional values. However, in practice, it is remarkably successful.
 \item The transformation can reduce sharing, causing the resulting program to be less efficient and duplicate an arbitrary amount of work. For certain types of analysis the duplication of work is not a problem, for other uses it is a severe problem.
 \end{itemize}
-
-\subsection{Roadmap}
-
-\todo{eliminate, and use as forward references}
-
-The sections following begin with a definition of our Core language (\S\ref{sec:core}), including what we consider to be a first-order program. Next we present an overview of our method (\S\ref{sec:overview}), followed by a more detailed account (\S\ref{sec:detailed}), along with a number of examples (\S\ref{sec:examples}). We classify where functional values may remain in a resultant program (\S\ref{sec:completeness}) and show how to modify our method to guarantee termination (\S\ref{sec:termination}). Finally we give results (\S\ref{sec:results}), review related work (\S\ref{sec:related}) and conclude (\S\ref{sec:conclusion}).
 
 \section{Core Language}
 \label{sec:core}
@@ -817,18 +812,6 @@ After transformation, there will be no instances of partial application, and all
 
 We prove this proposition with a series of lemmas about the resultant program.
 
-\subsection{Consequences}
-
-The above proposition means that replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. Another way of viewing this proposition is that after transformation the program will be first-order at runtime, even if there are some higher-order features present in the source program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Therefore, given the above restrictions, the following rewrites are valid:
-
-\ignore\begin{code}
-(\v -> x)  => bot
-x xs_      => bot
-f xs_      => bot    {-"\hspace{1cm}"-} if arity f /= length xs_
-\end{code}
-
-After performing these rewrites, the program is guaranteed to be first-order.
-
 \subsection{Lemmas}
 
 \begin{lemma}{No partial application}
@@ -905,6 +888,18 @@ main = case  nothing of
 
 In this example the lambda expression is never reached because that particular branch of the case expression is never taken.
 \end{example}
+
+\subsection{Consequences}
+
+Our proposition means that replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. Another way of viewing this proposition is that after transformation the program will be first-order at runtime, even if there are some higher-order features present in the source program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Therefore, given the above restrictions, the following rewrites are valid:
+
+\ignore\begin{code}
+(\v -> x)  => bot    {-"\hspace{3mm} \hbox{if not contributing to the arity of a function}"-}
+x xs_      => bot
+f xs_      => bot    {-"\hspace{3mm} \hbox{if } "-} arity f /= length xs_
+\end{code}
+
+After performing these rewrites, the program is guaranteed to be first-order.
 
 \section{Proof of Termination}
 \label{sec:termination}
