@@ -1210,10 +1210,11 @@ We measure program size by counting the number of lines of Core code. On average
 
 \section{Demand Analysis}
 
-\todo{finish this section}
+\todo{finish this section, citations etc.}
 
 GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
 
+\begin{example}
 \begin{code}
 main :: Double -> Double -> Double -> Double
 main x y = apply 10 (+x) y
@@ -1223,7 +1224,8 @@ apply 0 f x = x
 apply n f x = apply (n-1) f (f x)
 \end{code}
 
-But by generating a first-order variant of |main| and asking for its strictness information we get back that the argument |x| is strict and that the argument |y| is both strict and should be passed unboxed. In this particular case the gain is from specialisation giving a more efficient implementation, but in general it may also work. 
+But by generating a first-order variant of |main| and asking for its strictness information we get back that the argument |y| is strict. In this particular case the gain is from specialisation giving a more efficient implementation, but in general it may also work.
+\end{example}
 
 \section{Related Work}
 \label{sec:related}
