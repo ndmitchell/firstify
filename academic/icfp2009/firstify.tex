@@ -100,7 +100,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \preprintfooter{}   % 'preprint' option specified.
 
 \title{Losing Functions without Gaining Data}
-\subtitle{ -- a new method for defunctionalisation}
+\subtitle{ -- a new method for partial defunctionalisation}
 
 \authorinfo{Neil Mitchell\titlenote{The first author is supported by an EPSRC PhD studentship}}
            {University of York, UK}
@@ -123,7 +123,41 @@ languages, transformation
 \keywords
 Haskell, defunctionalisation, firstification
 
+\todo{think about variable names, perhaps have m/n range of expressions and x over variables? perhaps we only need one expression, so e range of expressions?}
+
 \section{Introduction}
+
+\todo{say in the introduction that the method is partial}
+
+\todo{say why having a partial method is still useful - and how being mainly first-order is still useful}
+
+\todo{say that just for analysis means slowdown is unimportant}
+
+\todo{discuss algebraic types}
+
+\todo{be careful: function vs top-level defined function}
+
+\todo{make very clear - non-recursive let's}
+
+\todo{make more precise the type differences, what type info do we rely on}
+
+\todo{give an intuition behind boxed lambdas}
+
+\todo{more information about homeomorphic embedding and the intuition - were there alternatives available}
+
+\todo{say more about why programs get smaller}
+
+\todo{note that small program size probably implies faster analysis}
+
+\todo{can you fuse the defunc and the analysis? interesting question for the conclusion}
+
+\todo{mention dead code elimination somewhere}
+
+\todo{mention that it is a pure lazy language}
+
+\todo{emphasise that Reynold's + mine first will give a much simpler program}
+
+\todo{say that the starting point in the results are the number of HO after initial desugaring, including type classes in to dictionaries etc}
 
 Higher-order functions are widely used in functional programming languages.  Having functions as first-class values leads to more concise code, but it often complicates analysis methods, such as those for checking pattern-match safety \cite{me:catch} or termination \cite{sereni:higher_order_termination}.
 
@@ -151,6 +185,14 @@ incList (x:xs)  = x+1 : incList xs
 
 Although this first-order variant of |incList| is longer (excluding the library function |map|), it is also more amenable to certain types of analysis. The method presented in this paper transforms the higher-order definition into the first-order one automatically.
 \end{example}
+
+
+
+
+
+Damien says: The analysis and verification of higher-order programs raises the issue of control-flow analysis for higher-order languages. The problem of constructing an accurate call graph for a higher-order program has been the topic of extensive research, and numerous methods for flow analysis, varying in complexity and precision, have been suggested.
+
+
 
 The problem we have chosen to tackle is to remove functional values without introducing data values, which can often be used to encode functions -- and thus leaves the complexity of the program the same.
 
@@ -191,7 +233,7 @@ expr  :=  \v -> x           {-"\text{\hspace{1cm}lambda abstraction}"-}
       |   let v = x in y    {-"\text{\hspace{1cm}non-recursive let expression}"-}
       |   case x of alts_   {-"\text{\hspace{1cm}case expression}"-}
 
-alt   := c -> vs_ x         {-"\text{\hspace{1cm}case alternative}"-}
+alt   := c vs_ -> x         {-"\text{\hspace{1cm}case alternative}"-}
 \end{code}
 \begin{code}
 arityExpr (ELam v x) = 1 + arityExpr x
@@ -234,7 +276,7 @@ We proceed by first giving a brief flavour of how these transformations may be u
 
 \subsection{Simplification}
 
-The simplification stage has two purposes: to remove some simple functional values, and to ensure a \textit{normal form} so other rules can apply. The simplification rules are simple, and many are found in optimising compilers. All the rules are given in \S\ref{sec:simplification_detail}.
+The simplification rules have two purposes: to remove some simple functional values, and to ensure a \textit{normal form} so other rules can apply. The simplification rules are simple, and many are found in optimising compilers. All the rules are given in \S\ref{sec:simplification_detail}.
 
 \begin{example}
 \begin{code}
@@ -248,7 +290,7 @@ one = let x = 1 in x
 \end{code}\codeexample
 \end{example}\smallskip
 
-\noindent Other rules do not eliminate lambda expressions, but put them into a form that other stages can remove.
+\noindent Other rules do not eliminate lambda expressions, but put them into a form that other rules can remove.
 
 \begin{example}
 \begin{code}
@@ -286,7 +328,7 @@ main = case  (primEqInt, primNeqInt) of
              (a,b) -> a 1 2
 \end{code}
 
-\noindent The simplification stage can now turn the program into a first-order variant, using rule (case-con) from \S\ref{sec:simplification_detail}.
+\noindent The simplification rules can now turn the program into a first-order variant, using rule (case-con) from \S\ref{sec:simplification_detail}.
 
 \begin{code}
 main = primEqInt 1 2
@@ -339,7 +381,7 @@ We define a number of goals: some are \textit{essential}, and others are \textit
 
 Our goals are primarily for analysis of the resultant code, not to compile and execute the result. Because we are not interested in performance, we permit the loss of sharing in computations if to do so will remove functional values. However, we will avoid the loss of sharing where possible, so the program remains closer to the original.
 
-\paragraph{Minimize the size of the program.} Previous defunctionalisation methods have reflected a concern to avoid undue code-size increase \cite{chin:higher_order_removal}. A smaller resultant program would be desirable, but not at the cost of clarity.
+\paragraph{Minimize the size of the program.} A smaller program is likely to be faster for any subsequent analysis. Previous work has speculated that there may be a substantial increase in code-size after defunctionalisation \cite{chin:higher_order_removal}.
 
 \paragraph{Make the transformation fast.} The implementation must be sufficiently fast to permit proper evaluation. Ideally, when combined with a subsequent analysis phase, the defunctionalisation should not take an excessive proportion of the runtime.
 
@@ -355,7 +397,7 @@ simplify,arity,inline,specialise :: Prog -> Prog
 \end{code}
 \end{comment}
 
-This section covers the rules that are applied non-deterministically. Many programs require a combination or rules to be applied, for example, the initial |incList| example requires rules from both simplification and specialisation.
+This section covers the rules that are applied non-deterministically. Many programs require a combination of rules to be applied, for example, the initial |incList| example requires rules from both simplification and specialisation.
 
 We have implemented our steps in a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. But to simplify the presentation here, we ignore these issues -- they are mostly tedious engineering concerns, and do not effect the underlying algorithm.
 
@@ -460,7 +502,7 @@ let v = x in \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
-The simplification rules have the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. The rules comprise standard simplification rules given in Figure \ref{fig:simplify}, which are found in most optimising compilers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. We believe that the combination or rules from Figure \ref{fig:lambda_simplify} and Figure \ref{fig:simplify} are confluent.
+The simplification rules have the goal of moving lambda expressions upwards, and introducing lambdas for partially applied functions. The rules comprise standard simplification rules given in Figure \ref{fig:simplify}, which are found in most optimising compilers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. We believe that the combination of rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} are confluent.
 
 \subsubsection{Lambda Introduction}
 
@@ -547,12 +589,12 @@ Recalling that |[e]| is shorthand for |(:) e []|, where |(:)| is the cons constr
 \noindent The following are \textit{not} boxed lambdas:
 
 \ignore\begin{code}
-\x -> id x
+\x -> [x]
 [id (\x -> x)]
 id [\x -> x]
 \end{code}
 
-The final expression \textit{evaluates to} a boxed lambda, but this information is hidden by the |id| function. We rely on specialisation to remove any boxed lambdas passed to functions.
+The final two expressions both \textit{evaluate to} a boxed lambda, but this information is hidden by the |id| function. We rely on specialisation to remove any boxed lambdas passed to functions.
 \end{example}
 
 \begin{definition}
@@ -567,7 +609,7 @@ case (f xs_) of alts_
 \end{code}\codeexample
 \end{definition}\bigskip
 
-As with the simplification stage, there may be some loss of sharing if the definition being inlined has arity 0 -- a constant applicative form (CAF). A Haskell implementation computes these expressions only once, and reuses their value as necessary. If they are inlined, this sharing will be lost.
+As with the simplification rules, there may be some loss of sharing if the definition being inlined has arity 0 -- a constant applicative form (CAF). A Haskell implementation computes these expressions only once, and reuses their value as necessary. If they are inlined, this sharing will be lost.
 
 \subsection{Specialisation}
 
@@ -592,7 +634,7 @@ map f xs = case  xs of
                  y:ys  -> f y : map f ys
 \end{code}
 
-Specialisation first finds the application of |map| in |main|, and generates the template \ignore|map (\x -> x) hole|. It then generates a unique name for the template (we choose |map_id|), and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including the call to |map| within the freshly generated |map_id|.
+Specialisation first finds the application of |map| in |main|, and generates the template \ignore|map (\x -> x) xs|. Next it abstracts the template to \ignore|map (\x -> x) hole|. It then generates a unique name for the template (we choose |map_id|), and generates an appropriate function body. Next all calls matching the template are replaced with calls to |map_id|, including the call to |map| within the freshly generated |map_id|.
 
 \begin{code}
 main xs = map_id xs
@@ -660,7 +702,7 @@ f (\v -> v) True
 We perform abstraction to reduce the number of different templates required, by replacing non-functional expressions with |hole|. For each sub-expression |x| in a template, it can be replaced with |hole| if the following two conditions hold:
 
 \begin{enumerate}
-\item |e| is not, and does not contain, any expressions which are either lambda expressions or boxed lambdas, e.g. we cannot replace |(\x -> x)| or |(let y = \x -> x in y)| with |hole|.
+\item |e| is not, and does not contain, any expressions which are either lambda expressions or boxed lambdas, e.g. we cannot substitute |hole| for |(\x -> x)| or |(let y = \x -> x in y)|.
 \item None of the free variables in |e| are bound in the template, e.g. we cannot replace the expression |f v| in |let v = 1 in f v| with |hole|, as the variable |v| is bound within the template.
 \end{enumerate}
 
@@ -711,6 +753,8 @@ map_id = \v_1 ->  let  xs = v_1
 \subsubsection{Using Templates}
 \label{sec:use_templates}
 
+\todo{we reuse template definitions indefinitely}
+
 After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to |hole| is passed as an argument.
 
 \begin{exampleany}{\ref{ex:map_id} (continued)}
@@ -733,11 +777,11 @@ We conjecture that the rules in each of the separate categories are confluent. I
 \subsection{Primitive Functions}
 \label{sec:primitives}
 
-Primitive functions do not have an associated body, and therefore cannot be examined or inlined. We make just two simple changes to support primitives.
+Primitive functions do not have an associated body, and therefore cannot be examined or inlined. We make two simple changes to support primitives.
 
 \begin{enumerate}
-\item We define that a primitive application is \textit{not} a boxed lambda.
-\item We restrict specialisation so that if a function to be specialised is actually a primitive, no template is generated. The reason for this restriction is that the generation of code associated with a template requires a one-step unfolding of the function, something which cannot be done for a primitive.
+\item We define that a primitive application is \textit{not} a boxed lambda, and has an arity derived from its type.
+\item We restrict specialisation so that if the function to be specialised is a primitive, no template is generated. This restriction is necessary because specialisation requires a one-step unfolding of the function, something which is impossible for a primitive.
 \end{enumerate}
 
 These restrictions mean that some programs using primitive functions cannot be made first-order.
@@ -754,7 +798,7 @@ Some primitives not only \textit{permit} functional values, but actually \textit
 
 \subsection{Recovering Input Expressions}
 
-Specialisation is the only stage which introduces new function names. In order to translate an expression in the result program to an equivalent expression in the input program, it is sufficient to replace all generated function names with their associated template, supplying all the necessary variables.
+Specialisation is the only rule which introduces new function names. In order to translate an expression in the result program to an equivalent expression in the input program, it is sufficient to replace all generated function names with their associated template, supplying all the necessary variables.
 
 \section{Examples}
 \label{sec:examples}
@@ -766,7 +810,7 @@ We now give two examples. Our method can convert the first example to a first-or
 An earlier version of our defunctionaliser inlined boxed lambdas everywhere they occurred. Inlining boxed lambdas means the |isBox| function does not have to examine the body of applied functions, and is therefore simpler. However, it was unable to cope with programs like this one:
 
 \begin{code}
-main = map ($ 1) gen
+main = map (\x -> x 1) gen
 gen = (\x -> x) : gen
 \end{code}
 
@@ -798,7 +842,9 @@ We have benchmarked these operations in a variety of settings and the list based
 \section{Restricted Completeness}
 \label{sec:completeness}
 
-Our method would be \textit{complete} if it made all programs to first-order. In this section we give some results about where expressions creating functional values can remain in a resulting program.
+\todo{strengthen, say we do make programs first-order}
+
+Our method would be \textit{complete} if it made all programs first-order. In this section we give some results about where expressions creating functional values can remain in a resulting program.
 
 \subsection{Proposition}
 
@@ -908,7 +954,7 @@ After performing these rewrites, the program is guaranteed to be first-order.
 We can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
 \end{comment}
 
-Our algorithm, as it stands, may not terminate. In order to ensure termination, it is necessary to bound both the inlining and specialisation stages. In this section we develop a mechanism to ensure termination, by first looking at how non-termination may arise.
+Our algorithm, as it stands, may not terminate. In order to ensure termination, it is necessary to bound both the inlining and specialisation rules. In this section we develop a mechanism to ensure termination, by first looking at how non-termination may arise.
 
 \subsection{Termination of Simplification}
 \label{sec:termination_simplification}
@@ -1162,6 +1208,22 @@ In order to gain acceptable speed, we perform a number of optimisations over the
 
 We measure program size by counting the number of lines of Core code. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers \cite{chin:higher_order_removal} that doing so might cause an explosion in code size.
 
+\section{Demand Analysis}
+
+\todo{finish this section}
+
+GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
+
+\begin{code}
+main :: Double -> Double -> Double -> Double
+main x y = apply 10 (+x) y
+
+apply :: Int -> (Double -> Double) -> Double -> Double
+apply 0 f x = x
+apply n f x = apply (n-1) f (f x)
+\end{code}
+
+But by generating a first-order variant of |main| and asking for its strictness information we get back that the argument |x| is strict and that the argument |y| is both strict and should be passed unboxed. In this particular case the gain is from specialisation giving a more efficient implementation, but in general it may also work. 
 
 \section{Related Work}
 \label{sec:related}
@@ -1199,7 +1261,7 @@ Reynolds' method has been used as a tool in program calculation \cite{danvy:defu
 
 \subsection{Removing Functional Values}
 
-The closest work to ours is by \citet{chin:higher_order_removal}, which itself is similar to that of \citet{nelan:firstification}. They define a higher-order removal method, with similar goals of removing functional values from a program. Their work shares some of the simplification rules, the arity raising and function specialisation. Despite these commonalities, there are big differences between their method and ours.
+The closest work to ours is by \citet{chin:higher_order_removal}, which itself is similar to that of \citet{nelan:firstification}. They define a higher-order removal method, with similar goals of removing functional values from a program. Their work shares some of the simplification rules, and has some notion of function specialisation. Despite these commonalities, there are big differences between their method and ours.
 
 \begin{itemize}
 \item Their method makes use of the \textit{types} of expressions, information that must be maintained and extended to work with additional type systems.
