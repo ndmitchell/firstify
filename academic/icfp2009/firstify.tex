@@ -147,8 +147,6 @@ Haskell, defunctionalisation, firstification
 
 \todo{say more about why programs get smaller}
 
-\todo{note that small program size probably implies faster analysis}
-
 \todo{can you fuse the defunc and the analysis? interesting question for the conclusion}
 
 \todo{mention dead code elimination somewhere}
@@ -233,7 +231,7 @@ expr  :=  \v -> x           {-"\text{\hspace{1cm}lambda abstraction}"-}
       |   let v = x in y    {-"\text{\hspace{1cm}non-recursive let expression}"-}
       |   case x of alts_   {-"\text{\hspace{1cm}case expression}"-}
 
-alt   := c vs_ -> x         {-"\text{\hspace{1cm}case alternative}"-}
+alt   :=  c vs_ -> x         {-"\text{\hspace{1cm}case alternative}"-}
 \end{code}
 \begin{code}
 arityExpr (ELam v x) = 1 + arityExpr x
@@ -493,7 +491,7 @@ let v = x in y
 
 \simp{let-lam}{
 \ignore\begin{code}
-let v = x in \w -> y
+let v = x in {-" "-} \w -> y
     => \w -> let v = x in y
 \end{code}}
 
@@ -1208,11 +1206,11 @@ In order to gain acceptable speed, we perform a number of optimisations over the
 
 We measure program size by counting the number of lines of Core code. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers \cite{chin:higher_order_removal} that doing so might cause an explosion in code size.
 
-\section{Demand Analysis}
+\section{Strictness Analysis}
 
 \todo{finish this section, citations etc.}
 
-GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
+The GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
 
 \begin{example}
 \begin{code}
