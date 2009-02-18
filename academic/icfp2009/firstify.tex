@@ -127,35 +127,21 @@ Haskell, defunctionalisation, firstification
 
 \section{Introduction}
 
+\todo{Mainly, there needs to be a clear answer to the questions such as
+the following:
+Why should the world be interested in this incomplete firstification method when there is Reynolds' complete method already available?
+What is good or about it, or interesting, or both?
+What is it useful for?}
+
 \todo{say in the introduction that the method is partial}
 
 \todo{say why having a partial method is still useful - and how being mainly first-order is still useful}
 
 \todo{say that just for analysis means slowdown is unimportant}
 
-\todo{discuss algebraic types}
-
 \todo{be careful: function vs top-level defined function}
 
-\todo{make very clear - non-recursive let's}
-
-\todo{make more precise the type differences, what type info do we rely on}
-
-\todo{give an intuition behind boxed lambdas}
-
-\todo{more information about homeomorphic embedding and the intuition - were there alternatives available}
-
-\todo{say more about why programs get smaller}
-
-\todo{can you fuse the defunc and the analysis? interesting question for the conclusion}
-
-\todo{mention dead code elimination somewhere}
-
-\todo{mention that it is a pure lazy language}
-
 \todo{emphasise that Reynold's + mine first will give a much simpler program}
-
-\todo{say that the starting point in the results are the number of HO after initial desugaring, including type classes in to dictionaries etc}
 
 Higher-order functions are widely used in functional programming languages.  Having functions as first-class values leads to more concise code, but it often complicates analysis methods, such as those for checking pattern-match safety \cite{me:catch} or termination \cite{sereni:higher_order_termination}.
 
@@ -234,8 +220,8 @@ expr  :=  \v -> x           {-"\text{\hspace{1cm}lambda abstraction}"-}
 alt   :=  c vs_ -> x         {-"\text{\hspace{1cm}case alternative}"-}
 \end{code}
 \begin{code}
-arityExpr (ELam v x) = 1 + arityExpr x
-arityExpr _ = 0
+arityExpr (ELam v x)  = 1 + arityExpr x
+arityExpr _           = 0
 \end{code}
 
 We let |v| range over locally defined variables, |x| and |y| over expressions, |f| over function names and |c| over constructors.
@@ -243,9 +229,15 @@ We let |v| range over locally defined variables, |x| and |y| over expressions, |
 \label{fig:core}
 \end{figure}
 
+\todo{we have algebraic types with arbitrary numbers of constructors, each with a fixed arity}
+
+\todo{the language is pure and lazy}
+
 The expression type of our Core language is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions, with a root function named |main|. The arity of a function is the result of applying |arityExpr| to its associated expression. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We allow full Haskell 98 data types, and assume that all Core programs are type correct.
 
-The variable, case, application and lambda expressions are much as they would be in any Core language. We restrict ourselves to non-recursive let expression. (Any recursive let expressions can be removed, with a possible increase in runtime complexity, using the methods described in \cite{me:thesis}.) The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented as a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f| and |body f| to denote the arity and body of function |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+The variable, case, application and lambda expressions are much as they would be in any Core language. We restrict ourselves to non-recursive let expressions. (Any recursive let expressions can be removed, with a possible increase in runtime complexity, using the methods described in \cite{me:thesis}.) The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented using a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f| and |body f| to denote the arity and body of function |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+
+\todo{We assume that type restrictions ensure we do not apply to a constrctor, and only case on a constructor}
 
 Informally, if a program creates functional values at runtime it is higher-order, otherwise it is first-order. Functional values can only be created in two ways: (1) a lambda expression that does not contribute to the arity of its enclosing function; or (2) a partially-applied function application. We therefore make the following definition:
 
@@ -548,7 +540,9 @@ Now |expensive| is recomputed for every element in |xs|. We include this rule in
 \subsection{Inlining}
 \label{sec:inlining}
 
-We use inlining of top-level functions as the first stage in the removal of functional values stored within a data value -- for example |Just (\x -> x)|. We refer to expressions that evaluate to functional values inside data values as \textit{boxed lambdas}. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the function's body is a boxed lambda; (2) the function application occurs within a case scrutinee.
+We use inlining of top-level functions as the first stage in the removal of functional values stored within a constructor -- for example |Just (\x -> x)|. To eliminate a functional value stored inside a constructor we eliminate the containing constructor by making it a case scrutinee and using the (case-con) rule. We move the constructor toward the case expression using inlining.
+
+We refer to expressions that evaluate to functional values inside constructors as \textit{boxed lambdas}. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the function's body is a boxed lambda; (2) the function application occurs within a case scrutinee.
 
 \begin{figure}
 \begin{code}
@@ -680,7 +674,7 @@ abstractVars vs x = ellipses
 \subsubsection{Generating Templates}
 \label{sec:need_templates}
 
-The idea is to generate templates for all function calls which pass functional values. Given a expression |x| a template is generated if: (1) |x| is a function application; and (2) at least one of the sub-expressions of |x| is either a lambda or a boxed lambda (see \S\ref{sec:inlining}). In all cases, the template generated is simply |x|.
+The idea is to generate templates for all function calls which pass functional values. Given a expression |e| a template is generated if: (1) |e| is a function application; and (2) at least one of the sub-expressions of |e| is either a lambda or a boxed lambda (see \S\ref{sec:inlining}). In all cases, the template generated is simply |e|.
 
 \begin{example}
 The following expressions generate templates:
@@ -697,7 +691,7 @@ f (\v -> v) True
 \subsubsection{Abstracting Templates}
 \label{sec:abstract_templates}
 
-We perform abstraction to reduce the number of different templates required, by replacing non-functional expressions with |hole|. For each sub-expression |x| in a template, it can be replaced with |hole| if the following two conditions hold:
+We perform abstraction to reduce the number of different templates required, by replacing non-functional expressions with |hole|. For each sub-expression |e| in a template, it can be replaced with |hole| if the following two conditions hold:
 
 \begin{enumerate}
 \item |e| is not, and does not contain, any expressions which are either lambda expressions or boxed lambdas, e.g. we cannot substitute |hole| for |(\x -> x)| or |(let y = \x -> x in y)|.
@@ -1044,6 +1038,8 @@ In the first iteration, the specialiser generates a version of |f| specialised f
 \label{fig:homeomorphic}
 \end{figure}
 
+\todo{more information about homeomorphic embedding and the intuition - were there alternatives available}
+
 To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}, given in Figure \ref{fig:homeomorphic}. The homeomorphic embedding $\unlhd$ is a well-quasi order, meaning there are no infinite admissible sequences. A sequence $s_1,s_2 \ldots$ is admissible if there are no $i < j$ such that $s_i \unlhd s_j$. This property only holds provided all elements are expressions over a finite alphabet.
 
 For each function, we associate a set $S$, of expressions. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet \neg(s \unlhd t)$. If $S$ is already admissible, then the sequence $S$ with $t$ added at the end is still admissible. After specialising with a template we add that template to the set $S$ associated with that expression. When we create a new function based on a template, we copy the $S$ associated with the function in which the specialisation is performed.
@@ -1187,6 +1183,8 @@ The termination bound used varies from 2 to 11 for the sample programs (see Boun
 
 \subsection{Creating of Functional Values}
 
+\todo{say that the starting point in the results are the number of HO after initial desugaring, including type classes in to dictionaries etc}
+
 We use Yhc generated programs as input, which have been lambda lifted \cite{lambda_lift}, so contain no lambda expressions. The residual program has no partial application, only lambda expressions. Most programs in our test suite start with hundreds of partial applications, but only 5 residual programs contain lambda expressions (see HO Create in Table \ref{tab:results}).
 
 For the purposes of testing defunctionalisation, we have worked on unmodified Yhc libraries, including all the low-level detail. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations. Most analysis operations work on an abstracted view of the program, which reduces the number and complexity of functional values.
@@ -1203,6 +1201,10 @@ The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2 \cite
 In order to gain acceptable speed, we perform a number of optimisations over the algorithm presented in \S\ref{sec:detailed}. (1) We transform functions in an order determined by a topological sort with respect to the call-graph. (2) We delay the transformation of dictionary components, as these will often be eliminated. (3) We track the arity and boxed lambda status of each function.
 
 \subsection{Program Size}
+
+\todo{after a trivial dead-code analysis to remove entirely unused function definitions}
+
+\todo{say more about why programs get smaller}
 
 We measure program size by counting the number of lines of Core code. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers \cite{chin:higher_order_removal} that doing so might cause an explosion in code size.
 
@@ -1278,6 +1280,8 @@ The specialisation and inlining steps are taken from existing program optimisers
 
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
+
+\todo{can you fuse the defunc and the analysis? interesting question for the conclusion}
 
 Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs.
 
