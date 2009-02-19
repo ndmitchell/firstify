@@ -229,13 +229,11 @@ We let |v| range over locally defined variables, |x| and |y| over expressions, |
 \label{fig:core}
 \end{figure}
 
-\todo{we have algebraic types with arbitrary numbers of constructors, each with a fixed arity}
-
-\todo{the language is pure and lazy}
-
-The expression type of our Core language is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions, with a root function named |main|. The arity of a function is the result of applying |arityExpr| to its associated expression. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We allow full Haskell 98 data types, and assume that all Core programs are type correct.
+Our Core language is both pure and lazy. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions, with a root function named |main|. The arity of a function is the result of applying |arityExpr| to its associated expression. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We allow full Haskell 98 data types, assuming a finite number of constructors each with a specific arity.
 
 The variable, case, application and lambda expressions are much as they would be in any Core language. We restrict ourselves to non-recursive let expressions. (Any recursive let expressions can be removed, with a possible increase in runtime complexity, using the methods described in \cite{me:thesis}.) The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented using a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f| and |body f| to denote the arity and body of function |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+
+We assume that all Core programs are type correct. In particular we assume that when a program is evaluated a constructor will never be the first argument of a general application, and a lambda expression will never be the subject of a case expression. By maintaining the semantics of the program in all transformations we guarantee to maintain the above invariants.
 
 \todo{We assume that type restrictions ensure we do not apply to a constrctor, and only case on a constructor}
 
@@ -1216,10 +1214,10 @@ The GHC uses demand analysis to figure out things. This is restricted to first-o
 
 \begin{example}
 \begin{code}
-main :: Double -> Double -> Double -> Double
+main :: Int -> Int -> Int
 main x y = apply 10 (+x) y
 
-apply :: Int -> (Double -> Double) -> Double -> Double
+apply :: Int -> (Int -> Int) -> Int -> Int
 apply 0 f x = x
 apply n f x = apply (n-1) f (f x)
 \end{code}
@@ -1281,15 +1279,11 @@ The specialisation and inlining steps are taken from existing program optimisers
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-\todo{can you fuse the defunc and the analysis? interesting question for the conclusion}
-
-Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs.
+Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. For some types of analysis it may be possible to fuse our transformations with a first-order analysis to produce a higher-order analysis.
 
 Our method has already found practical use within the Catch tool, and we hope it can be of benefit to others. We have released our tool, both as a command line program, and as a library that analysis programs can invoke. Currently the implementation is based around the core language from the Yhc compiler, which restricts our input programs to the Haskell 98 language. By making use of the GHC front end, we could deal with many language extensions.
 
 Our method is whole program, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
-
-We have developed our method for analysis, not performance. However, for many simple examples, the resultant program performs better than the original. By restricting rules that reduce sharing, our defunctionalisation method may be appropriate for integration into an optimising compiler.
 
 The use of a numeric termination bound in the homeomorphic embedding is regrettable, but practically motivated. We need further research to determine if such a numeric bound is necessary, or if other measures could be used.
 
