@@ -102,7 +102,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \title{Losing Functions without Gaining Data}
 \subtitle{ -- a new method for partial defunctionalisation}
 
-\authorinfo{Neil Mitchell\titlenote{The first author is supported by an EPSRC PhD studentship}}
+\authorinfo{Neil Mitchell\titlenote{This work was done while the first author was supported by an EPSRC PhD studentship}}
            {University of York, UK}
            {\url{http://www.cs.york.ac.uk/~ndm/}}
 \authorinfo{Colin Runciman}
@@ -123,25 +123,7 @@ languages, transformation
 \keywords
 Haskell, defunctionalisation, firstification
 
-\todo{think about variable names, perhaps have m/n range of expressions and x over variables? perhaps we only need one expression, so e range of expressions?}
-
 \section{Introduction}
-
-\todo{Mainly, there needs to be a clear answer to the questions such as
-the following:
-Why should the world be interested in this incomplete firstification method when there is Reynolds' complete method already available?
-What is good or about it, or interesting, or both?
-What is it useful for?}
-
-\todo{say in the introduction that the method is partial}
-
-\todo{say why having a partial method is still useful - and how being mainly first-order is still useful}
-
-\todo{say that just for analysis means slowdown is unimportant}
-
-\todo{be careful: function vs top-level defined function}
-
-\todo{emphasise that Reynold's + mine first will give a much simpler program}
 
 Higher-order functions are widely used in functional programming languages.  Having functions as first-class values leads to more concise code, but it often complicates analysis methods, such as those for checking pattern-match safety \cite{me:catch} or termination \cite{sereni:higher_order_termination}.
 
@@ -170,42 +152,42 @@ incList (x:xs)  = x+1 : incList xs
 Although this first-order variant of |incList| is longer (excluding the library function |map|), it is also more amenable to certain types of analysis. The method presented in this paper transforms the higher-order definition into the first-order one automatically.
 \end{example}
 
-
-
-
-
-Damien says: The analysis and verification of higher-order programs raises the issue of control-flow analysis for higher-order languages. The problem of constructing an accurate call graph for a higher-order program has been the topic of extensive research, and numerous methods for flow analysis, varying in complexity and precision, have been suggested.
-
-
-
-The problem we have chosen to tackle is to remove functional values without introducing data values, which can often be used to encode functions -- and thus leaves the complexity of the program the same.
+\smallskip
 
 Our defunctionalisation method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new. As far back as 1972 Reynolds gave a solution, now known as \textit{Reynolds style defunctionalisation} \cite{reynolds:defunc}. Unfortunately, this method effectively introduces a mini-interpreter, which causes problems for analysis tools. Our method produces a program closer to what a human might have written, if denied the use of functional values.
 
-Our method has been implemented in Haskell \cite{haskell}, and operates over the Core language from the York Haskell Compiler \cite{me:yhc_core}. We have used our transformation within the Catch analysis tool \cite{me:catch}, which checks for potential pattern-match errors in Haskell. Catch is a first-order analysis, and without a defunctionalisation method we wouldn't be able to apply Catch to real programs. We have made our defunctionalisation method available as a library on Hackage\footnote{\url{http://hackage.haskell.org/}, under ``firstify''}.
+There are two significant limitations to our method:
+
+\negsmallskip
+
+\begin{enumerate}
+\item The transformation can \textit{reduce sharing}, causing the resulting program to be less efficient and duplicate an arbitrary amount of work. Our method is still useful if the program is transformed, analysed, and then the results of the analysis are applied to the original program. For certain types of analysis (i.e. pattern-match checking and termination) this technique works well, for others (i.e. compilation) it does not.
+\item Our algorithm is not complete -- it \textit{does not} always succeed in removing all functional values. However, in practice it is remarkably successful, removing all functional values from over 90\% of the nofib suite (see \S\ref{sec:results}). Even when it does not succeed, it usually reduces the number of functional values -- allowing a subsequent analysis to either use a poor approximation of functional values, or to use Reynolds' method afterwards, resulting in a simpler first-order program than Reynolds' method alone.
+\end{enumerate}
+
+\negsmallskip
+
+Our method has been implemented in Haskell \cite{haskell}, and operates over the Core language from the York Haskell Compiler \cite{me:yhc_core}. We have used our transformation within the Catch analysis tool \cite{me:catch}, which checks for potential pattern-match errors in Haskell. Catch is a first-order analysis, and without a defunctionalisation method we wouldn't be able to apply Catch to real programs.
 
 \subsection{Contributions}
 
 Our paper makes the following contributions:
 
 \begin{itemize}
-\item We define a defunctionalisation method which, unlike some previous work, does not introduce new data types (\S\ref{sec:overview}, \S\ref{sec:detailed}).
-\item Our method can deal with the complexities of a language like Haskell, including type classes, programs using continuation-passing style and monads.
-\item Our method makes use of standard transformation steps, but combined in a novel way.
-\item We classify where higher-order elements may remain in a resultant program (\S\ref{sec:completeness}).
+\item We define a defunctionalisation method which, unlike some previous work, does not introduce new data types (\S\ref{sec:overview}, \S\ref{sec:detailed}). Our method makes use of standard transformation steps, but with precise restrictions on their applicability.
+\item We show where higher-order elements may remain in a resultant program, and show that given certain restrictions we guarantee a first-order result (\S\ref{sec:completeness}).
 \item We identify restrictions which guarantee termination, but are not overly limiting (\S\ref{sec:termination}).
-\item We have implemented our method, and present measured results for much of the nofib benchmark suite (\S\ref{sec:results}).
-\end{itemize}
-
-\noindent There are a number of limitations to our approach, most importantly:
-
-\begin{itemize}
-\item Our algorithm is not complete -- it \textit{does not} always succeed in removing all functional values. However, in practice, it is remarkably successful.
-\item The transformation can reduce sharing, causing the resulting program to be less efficient and duplicate an arbitrary amount of work. For certain types of analysis the duplication of work is not a problem, for other uses it is a severe problem.
+\item We have implemented our method, and present measured results for much of the nofib benchmark suite (\S\ref{sec:results}). Our method can deal with the complexities of a language like Haskell, including type classes, programs using continuation-passing style and monads.
+\item We describe how to apply our results to an existing analysis tool, using GHC's strictness analyser as an example (\S\ref{sec:strictness}).
 \end{itemize}
 
 \section{Core Language}
 \label{sec:core}
+
+\todo{think about variable names, perhaps have m/n range of expressions and x over variables? perhaps we only need one expression, so e range of expressions?}
+
+\todo{be careful: function vs top-level defined function}
+
 
 \begin{figure}
 \ignore\begin{code}
@@ -1194,9 +1176,14 @@ In order to gain acceptable speed, we perform a number of optimisations over the
 
 We measure program size by counting the number of lines of Core code, after a simple dead-code analysis to remove entirely unused function definitions. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers \cite{chin:higher_order_removal} that doing so might cause an explosion in code size.
 
-\section{Strictness Analysis}
+\section{Making an analysis higher-order}
+\label{sec:strictness}
 
 \todo{finish this section, citations etc.}
+
+This section should "describe how to apply our results to an existing analysis tool, using GHC's strictness analyser as an example (\S\ref{sec:strictness})"
+
+Don't want to arbitrarily do the steps in our transformation, many important things like let-positioning \cite{spj:letfloating} are very critical and don't want to be played around with.
 
 The GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
 
