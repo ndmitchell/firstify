@@ -5,6 +5,7 @@
 \usepackage{natbib}
 \usepackage{multirow}
 \usepackage{setspace}
+\usepackage{balance}
 
 \include{paper}
 
@@ -112,7 +113,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \maketitle
 
 \begin{abstract}
-We describe a transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice it is remarkably successful. Our transform is useful in combination with analysis operations, such as pattern-match safety or termination checking.
+We describe a transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful. Our transform is useful in combination with analysis operations, such as pattern-match safety or termination checking.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -184,11 +185,6 @@ Our paper makes the following contributions:
 \section{Core Language}
 \label{sec:core}
 
-\todo{think about variable names, perhaps have m/n range of expressions and x over variables? perhaps we only need one expression, so e range of expressions?}
-
-\todo{be careful: function vs top-level defined function}
-
-
 \begin{figure}
 \ignore\begin{code}
 expr  :=  \v -> x           {-"\text{\hspace{1cm}lambda abstraction}"-}
@@ -206,7 +202,7 @@ arityExpr (ELam v x)  = 1 + arityExpr x
 arityExpr _           = 0
 \end{code}
 
-We let |v| range over locally defined variables, |x| and |y| over expressions, |f| over function names and |c| over constructors.
+We let |v| range over locally defined variables, |x| and |y| over expressions, |f| over top-level function names and |c| over constructors.
 \caption{Core Language.}
 \label{fig:core}
 \end{figure}
@@ -1176,29 +1172,25 @@ In order to gain acceptable speed, we perform a number of optimisations over the
 
 We measure program size by counting the number of lines of Core code, after a simple dead-code analysis to remove entirely unused function definitions. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers \cite{chin:higher_order_removal} that doing so might cause an explosion in code size.
 
-\section{Making an analysis higher-order}
+\section{Making an Analysis Higher-Order}
 \label{sec:strictness}
 
-\todo{finish this section, citations etc.}
-
-This section should "describe how to apply our results to an existing analysis tool, using GHC's strictness analyser as an example (\S\ref{sec:strictness})"
-
-Don't want to arbitrarily do the steps in our transformation, many important things like let-positioning \cite{spj:letfloating} are very critical and don't want to be played around with.
-
-The GHC uses demand analysis to figure out things. This is restricted to first-order values. For example, the following program is detected to be lazy in both its arguments:
+In this section we show that our method can be used to improve the results of an existing analysis. As an example we choose GHC's demand analysis \cite{ghc}, which is responsible for determining which arguments to a function are strict.
 
 \begin{example}
 \begin{code}
 main :: Int -> Int -> Int
 main x y = apply 10 (+x) y
 
-apply :: Int -> (Int -> Int) -> Int -> Int
+apply :: Int -> (alpha -> alpha) -> alpha -> alpha
 apply 0 f x = x
 apply n f x = apply (n-1) f (f x)
 \end{code}
 
-But by generating a first-order variant of |main| and asking for its strictness information we get back that the argument |y| is strict. In this particular case the gain is from specialisation giving a more efficient implementation, but in general it may also work.
+GHC's demand analysis reports that the |main| function is lazy in both arguments. By generating a first-order variant of |main| and then applying the demand analysis, we find that the argument |y| is strict. This strictness information can then be applied back to the original program.
 \end{example}
+
+While it is possible to directly strengthen the demand analysis in GHC, doing so is very dependent on the precise details of the analysis -- while a combination with our first-order reduction method treats the analysis as a black box. Another way to achieve more accurate results for GHC's demand analysis would be for the compiler to apply some of the rules from our method as part of its optimisation. However, some of our rules loose sharing, and there are many details which GHC pays careful attention to, such as where let expressions are located \cite{spj:letfloating}, which our rules do not take account of.
 
 \section{Related Work}
 \label{sec:related}
@@ -1264,8 +1256,10 @@ The use of a numeric termination bound in the homeomorphic embedding is regretta
 
 Many analysis methods, in fields such as strictness analysis and termination analysis, start out first-order and are gradually extended to work in a higher-order language. Defunctionalisation offers an alternative approach, instead of extending the analysis method, we transform the functional values away, enabling more analysis methods to work on a greater range of programs.
 
+\balance
 
 \bibliographystyle{plainnat}
+\small
 \bibliography
 
 \end{document}
