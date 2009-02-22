@@ -209,7 +209,7 @@ We let |v| range over locally defined variables, |x| and |y| over expressions, |
 
 Our Core language is both pure and lazy. The expression type is given in Figure \ref{fig:core}. A program is a mapping of function names to expressions, with a root function named |main|. The arity of a function is the result of applying |arityExpr| to its associated expression. We initially assume there are no primitive functions in our language, but explain how to extend our method to deal with them in \S\ref{sec:primitives}. We allow full Haskell 98 data types, assuming a finite number of different constructors each with a fixed arity.
 
-The variable, case, application and lambda expressions are much as they would be in any Core language. We restrict ourselves to non-recursive let expressions. (Any recursive let expressions can be removed, with a possible increase in runtime complexity, using the methods described in \cite{me:thesis}.) The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented using a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f| and |body f| to denote the arity and body of function |f|. We use the function |rhs| to extract the expression on the right of a case alternative.
+The variable, case, application and lambda expressions are much as they would be in any Core language. We restrict ourselves to non-recursive let expressions. (Any recursive let expressions can be removed, with a possible increase in runtime complexity, using the methods described in \cite{me:thesis}.) The constructor expression consists of a constructor and a list of expressions, exactly matching the arity of the constructor. (Any partially applied constructor can be represented using a lambda expression.) A function application consists of a function name and a possibly empty list of argument expressions. If a function is given fewer arguments than its arity we refer to it as \textit{partially-applied}, matching the arity is \textit{fully-applied}, and more than the arity is \textit{over-applied}. We use the meta functions |arity f| and |body f| to denote the arity and body of function |f|. We use the function |rhs| to extract the expression on the right of a case alternative. We define the syntactic sugar \ignore|f v = x| to mean \ignore|f = \v -> x|.
 
 We assume that all Core programs are type correct. In particular we assume that when a program is evaluated a constructor will never be the first argument of a general application, and a lambda will never be the subject of a case expression. All our transformations are semantics preserving, so maintain the above invariants.
 
@@ -837,17 +837,17 @@ A lambda cannot be the scrutinee in a case expression as it would not be well ty
 
 \begin{lemma}{The outer parent of a boxed lambda must be one of: the root of a function definition; an argument to an application; a lambda expression}
 
-For the outer parent of a boxed lambda we refer to an expression which is not itself a boxed lambda, but contains a boxed lambda as an immediate subexpression. Using the definition of |isBox| from Figure \ref{fig:boxed_lambda} we restrict the outer parent of a boxed lambda to the binding of a let, the scrutinee of a case, and argument to a function or one of the locations mentioned in the lemma. We remove the binding of a let with (bind-box) and the argument to a function with specialise.
+For the outer parent of a boxed lambda we refer to an expression which is not itself a boxed lambda, but contains a boxed lambda as an immediate subexpression. Using the definition of |isBox| from Figure \ref{fig:boxed_lambda} we restrict the outer parent of a boxed lambda to the binding of a let, the scrutinee of a case, and argument to a function or one of the locations mentioned in the lemma. We remove the binding of a let with (bind-box) and the argument to a function with specialisation.
 
-To remove a boxed lambda from a case scrutinee we observe that a boxed lambda must be a constructor application, a let expression, a case expression or a function application. The first three are removed with the rules (case-con), (case-let) and (case-case). The function application based boxed lambda is removed with inlining.
+To remove a boxed lambda from a case scrutinee we observe that a boxed lambda must be a constructor application, a let expression, a case expression or a function application. The first three are removed with the rules (case-con), (case-let) and (case-case), the final one is removed by inlining.
 \end{lemma}
 
-\begin{lemma}{A boxed lambda must have a type that may contain a functional value}
+\begin{lemma}{A boxed lambda must have a type that permits a functional value}
 
-The base case of a boxed lambda is a constructor application to a lambda, which trivially contains a lambda. For let and case, the type of the expression is the type of the inner boxed lambda. The remaining case is if |((\vs_ -> b) xs_)| is able to contain a functional value. As |b| must be a boxed lambda, i.e. a constructor wrapping a lambda, any application and abstraction operations alone cannot examine the constructor, so cannot remove the functional type.
+The base case of a boxed lambda is a constructor application to a lambda, which trivially contains a lambda. For let and case, the type of the expression is the type of the inner boxed lambda. The remaining case is if |((\vs_ -> b) xs_)| permits a functional value. As |b| must be a boxed lambda, i.e. a constructor wrapping a lambda, any application and abstraction operations alone cannot examine the constructor, so cannot remove the functional type.
 \end{lemma}
 
-\begin{lemma}{A function whose root is a boxed lambda must be called from the argument of an application or inside a lambda}
+\begin{lemma}{A function whose body is a boxed lambda must be called from the argument of an application or inside a lambda}
 
 An application of a function whose root is a boxed lambda is itself a boxed lambda, therefore the restrictions on where a boxed lambda can reside apply to function applications whose root is a boxed lambda.
 \end{lemma}
@@ -898,7 +898,7 @@ In this example the lambda expression is never reached because that particular b
 \subsection{Transformation to First-Order}
 \label{sec:consequences}
 
-Our proposition means that replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. Another way of viewing this proposition is that after transformation the program will be \textit{first-order at runtime}, even if there are expressions that create or use functional values in the source program. In addition, provided the three restrictions are met, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Therefore, the following rewrites are valid:
+Our proposition means that, provided the three restrictions are met, replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Another way of viewing the proposition is that after transformation the program will be \textit{first-order at runtime}, even if there are expressions that create or use functional values in the source program. Therefore, the following rewrites are valid:
 
 \ignore\begin{code}
 (\v -> x)  => bot    {-"\hspace{3mm} \hbox{if not contributing to the arity of a function}"-}
@@ -939,6 +939,7 @@ In order to check the termination of the simplifier we have used the AProVE syst
 
 The encoding of the (bind-box) and (bind-lam) rules is excluded. Given these rules, there are non terminating sequences. For example:
 
+\begin{onepage}
 \ignore\begin{code}
 (\x -> x x) (\x -> x x)
    => -- (lam-app) rule
@@ -946,6 +947,7 @@ let x = \x -> x x in x x
    => -- (bind-lam) rule
 (\x -> x x) (\x -> x x)
 \end{code}
+\end{onepage}
 
 Such expressions are a problem for GHC, and can cause the compiler to non-terminate if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. This limited is intended to give a strong guarantee of termination, and will only be necessary rarely -- hence the high bound.
 
@@ -997,9 +999,9 @@ In the first iteration, the specialiser generates a version of |f| specialised f
 
 To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}. The relation $x \unlhd y$ indicates the expression $x$ is an embedding of $y$. We can define $\unlhd$ using the following rewrite rule:
 
-\[
-\mathit{emb} = \{f(x_1,\dots,x_n) \rightarrow x_i \, || \, 1 \leq i \leq n\}
-\]
+\begin{center}
+$\mathit{emb} = \{f(x_1,\dots,x_n) \rightarrow x_i \, || \, 1 \leq i \leq n\}$
+\end{center}
 
 Now $x \unlhd y$ can be defined as $x \leftarrow^*_{\mathit{emb}} y$ \cite{term_rewriting}. The rule $\mathit{emb}$ takes an expression, and replaces it with one of its immediate subexpressions. If repeated non-deterministic application of this rule to any subexpression transforms $y$ to $x$, then $x \unlhd y$. The intuition is that by removing some parts of $y$ we obtain $x$, or that $x$ is somehow ``contained'' within $y$.
 
@@ -1112,7 +1114,7 @@ We have tested our method with programs drawn from the nofib benchmark suite \ci
 \item List comprehensions in Yhc are desugared to continuation-passing style. There are other translations which require less functional value manipulations \cite{coutts:stream_fusion}.
 \end{itemize}
 
-We have tested all 14 programs from the imaginary section of the nofib suite, 35 of the 47 spectral programs, and 17 of the 30 real programs. The remaining 25 programs do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. Upon applying our defunctionalisation method, 4 programs are curtailed by the termination bound and 2 pass functional values to primitives. The remaining 60 programs do not create or use functional values at runtime, and can be transformed to first-order as described in \S\ref{sec:consequences}. We first discuss the residual programs which remain higher-order, then those which contain higher-order expressions but can be rewritten as first-order, then make some observations about each of the columns in the table.
+We have tested all 14 programs from the imaginary section of the nofib suite, 35 of the 47 spectral programs, and 17 of the 30 real programs. The remaining 25 programs do not compile using the Yhc compiler, mainly due to missing or incomplete libraries. Upon applying our defunctionalisation method, 4 programs are curtailed by the termination bound and 2 pass functional values to primitives. The remaining 60 programs can be transformed to first-order as described in \S\ref{sec:consequences}. We first discuss the residual programs which remain higher-order, then those which contain higher-order expressions but can be rewritten as first-order, then make some observations about each of the columns in the table.
 
 \subsection{Higher-Order Programs}
 
@@ -1129,7 +1131,7 @@ This function is invoked with the IO monad, so the |return ()| expression is a f
 
 \subsection{First-Order Programs}
 
-Of the 66 programs tested, 60 can that can be rewritten as first-order using the rules defined in \S\ref{sec:consequences}. When looking at the resultant programs, 3 contain lambda expressions, and all but 5 contain expressions which could use functional values.
+Of the 66 programs tested, 60 can be rewritten as first-order using the rules defined in \S\ref{sec:consequences}. When looking at the resultant programs, 3 contain lambda expressions, and all but 5 contain expressions which could use functional values.
 
 The pretty, constraints and mkhprog programs pass functional values to expressions that evaluate to $\bot$. The case in pretty comes from the fragment:
 
@@ -1155,7 +1157,7 @@ The vast majority of programs which have residual uses of functional values resu
 
 The termination bound used varies from 2 to 11 for the sample programs (see Bound in Table \ref{tab:results}). If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no apparent relation between the size of a program and the termination bound.
 
-\subsection{Creation and uses of Functional Values}
+\subsection{Creation and Uses of Functional Values}
 
 We use Yhc generated programs as input. Yhc performs desugaring of the Haskell source code, introducing dictionaries of functions to implement type classes, and performing lambda lifting \cite{lambda_lift}. As a result the input programs have no lambda expressions, only partial application. Conversely, the (eta) rule from \ref{fig:simplify} ensures residual programs have no partial application, only lambda expressions. Most programs in our test suite start with hundreds of partial applications, but only 9 residual programs contain lambda expressions (see HO Create in Table \ref{tab:results}).
 
@@ -1246,9 +1248,7 @@ The specialisation and inlining steps are taken from existing program optimisers
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. For some types of analysis it may be possible to fuse our transformations with a first-order analysis to produce a higher-order analysis.
-
-Our method has already found practical use within the Catch tool, and we hope it can be of benefit to others. We have released our tool, both as a command line program, and as a library that analysis programs can invoke. Currently the implementation is based around the core language from the Yhc compiler, which restricts our input programs to the Haskell 98 language. By making use of the GHC front end, we could deal with many language extensions.
+Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. Our method has already found practical use within the Catch tool, allowing a first-order pattern-match analysis to be applied to real Haskell programs.
 
 Our method is whole program, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
 
