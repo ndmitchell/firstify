@@ -101,7 +101,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \preprintfooter{}   % 'preprint' option specified.
 
 \title{Losing Functions without Gaining Data}
-\subtitle{ -- a new method for partial defunctionalisation}
+\subtitle{ -- another look at defunctionalisation}
 
 \authorinfo{Neil Mitchell\titlenote{This work was done while the first author was supported by an EPSRC PhD studentship}}
            {University of York, UK}
@@ -162,8 +162,8 @@ There are two significant limitations to our method:
 \negsmallskip
 
 \begin{enumerate}
-\item The transformation can \textit{reduce sharing}, causing the resulting program to be less efficient and duplicate an arbitrary amount of work. Our method is still useful if the program is transformed, analysed, and then the results of the analysis are applied to the original program. For certain types of analysis (i.e. pattern-match checking and termination) this technique works well, for others (i.e. compilation) it does not.
-\item Our algorithm is not complete -- it \textit{does not} always succeed in removing all functional values. However, in practice it is remarkably successful, removing all functional values from over 90\% of the nofib suite (see \S\ref{sec:results}). Even when it does not succeed, it usually reduces the number of functional values -- allowing a subsequent analysis to either use a poor approximation of functional values, or to use Reynolds' method afterwards, resulting in a simpler first-order program than Reynolds' method alone.
+\item The transformation can \textit{reduce sharing}, causing the resulting program to be less efficient.  So our defunctionalisation method is not appropriate as a  stage in compilation.  But it works well used as a preliminary stage in program analysis, effectively making first-order analyses applicable to higher-order programs: examples include analyses for safe pattern-matching and for termination.
+\item The transformation is \textit{not complete}.  In some programs there may be residual higher-order expressions.  However, the possible occurrences of such residual expressions can be characterised precisely, and mild restrictions on original programs guarantee first-order results.  In practice, our method is very often completely successful: for example defunctionalisation is complete for over 90\% of the nofib benchmark programs.
 \end{enumerate}
 
 \negsmallskip
@@ -1192,7 +1192,7 @@ apply n f x = apply (n-1) f (f x)
 GHC's demand analysis reports that the |main| function is lazy in both arguments. By generating a first-order variant of |main| and then applying the demand analysis, we find that the argument |y| is strict. This strictness information can then be applied back to the original program.
 \end{example}
 
-While it is possible to directly strengthen the demand analysis in GHC, doing so is very dependent on the precise details of the analysis -- while a combination with our first-order reduction method treats the analysis as a black box. Another way to achieve more accurate results for GHC's demand analysis would be for the compiler to apply some of the rules from our method as part of its optimisation. However, some of our rules loose sharing, and there are many details which GHC pays careful attention to, such as where let expressions are located \cite{spj:letfloating}, which our rules do not take account of.
+No doubt there are other ways in which GHC's demand analysis could be improved, by extending and reworking the analysis machinery itself.  But a big advantage of adding a preliminary defunctionalisation stage is that it is modular: the analysis itself is treated as a black box.
 
 \section{Related Work}
 \label{sec:related}
@@ -1243,18 +1243,20 @@ In addition, functional programs now use monads, IO continuations and type class
 
 \subsection{Partial Evaluation and Supercompilation}
 
-The specialisation and inlining steps are taken from existing program optimisers, as is the termination strategy of homeomorphic embedding. A lot of program optimisers include some form of specialisation and so remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms. Our initial attempt at removing functional values involved modifying a supercompiler \cite{me:supero}. But the optimiser is not attempting to preserve correspondence to the original program, so will optimise all aspects of the program equally, instead of focusing on the higher-order elements. Overall, the results were poor.
+The specialisation and inlining steps are taken from existing program optimisers, as is the termination strategy of homeomorphic embedding. A lot of program optimisers include some form of specialisation and so remove some higher-order functions, such as partial evaluation \cite{jones:partial_evaluation} and supercompilation \cite{supercompilation}. We have certainly benefited from ideas in both these areas in developing our algorithms.
 
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
+\todo{suggest more detailed comparative investigation of higher-order analysis versus defunctionalisation followed by first-order analysis.  Are there no literature refs in this area?}
+
 Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. Our method has already found practical use within the Catch tool, allowing a first-order pattern-match analysis to be applied to real Haskell programs.
 
-Our method is whole program, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
+Our method works on whole programs, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed-source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
 
 The use of a numeric termination bound in the homeomorphic embedding is regrettable, but practically motivated. We need further research to determine if such a numeric bound is necessary, or if other measures could be used.
 
-Many analysis methods, in fields such as strictness analysis and termination analysis, start out first-order and are gradually extended to work in a higher-order language. Defunctionalisation offers an alternative approach, instead of extending the analysis method, we transform the functional values away, enabling more analysis methods to work on a greater range of programs.
+Many analysis methods, in fields such as strictness analysis and termination analysis, start out first-order and are gradually extended to work in a higher-order language. Defunctionalisation offers an alternative approach: instead of extending the analysis method, we transform the functional values away, enabling more analysis methods to work on a greater range of programs.
 
 \balance
 
