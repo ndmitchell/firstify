@@ -29,6 +29,8 @@
 %format (ELet a b c) = "\ll{}\!\!" let a = b in c "\rr{}"
 %format (EAlt a b c) = "\ll{}" a \? b -> c "\rr{}"
 
+%format AgdaNat = "\mathbb{N}"
+
 \newcommand{\simp}[2]{\begin{minipage}{6.4cm}#2\end{minipage} & (#1) \\}
 \newenvironment{simplify}
     {\noindent
@@ -1177,7 +1179,13 @@ We measure program size by counting the number of lines of Core code, after a si
 \section{Making an Analysis Higher-Order}
 \label{sec:strictness}
 
-In this section we show that our method can be used to improve the results of an existing analysis. As an example we choose GHC's demand analysis \cite{ghc}, which is responsible for determining which arguments to a function are strict.
+\todo{rewrite and revise}
+
+In this section we show that our method can be used to improve the results of an existing analysis. We also need this to make Catch higher-order, such as \cite{me:catch}. We now show how to do it for strictness and termination analysis.
+
+\subsection{Strictness Analysis}
+
+As an example we choose GHC's demand analysis \cite{ghc}, which is responsible for determining which arguments to a function are strict.
 
 \begin{example}
 \begin{code}
@@ -1193,6 +1201,25 @@ GHC's demand analysis reports that the |main| function is lazy in both arguments
 \end{example}
 
 No doubt there are other ways in which GHC's demand analysis could be improved, by extending and reworking the analysis machinery itself.  But a big advantage of adding a preliminary defunctionalisation stage is that it is modular: the analysis itself is treated as a black box.
+
+\subsection{Termination Analysis}
+
+As an example of termination analysis we show how to improve the termination analysis in Agda \cite{agda}, which is provided by a termination analysis based around that found in Foetus \cite{abel:foetus}.
+
+\begin{example}
+\ignore\begin{code}
+cons : (AgdaNat -> List AgdaNat) -> AgdaNat -> List AgdaNat
+cons f x = x :: f x
+
+downFrom : AgdaNat -> List AgdaNat
+downFrom = cons f
+    where  f : AgdaNat -> List AgdaNat
+           f zero     = []
+           f (suc x)  = downFrom x
+\end{code}
+
+If the above code is checked by Agda it reports that termination checking fails |downFrom| function. If we first transform the code to first-order, and then check it, we succeed. 
+\end{example}
 
 \section{Related Work}
 \label{sec:related}
