@@ -817,7 +817,7 @@ After transformation, there will be no partial applications, and all lambda expr
 
 \begin{enumerate}
 \item The termination criteria do not curtail defunctionalisation (see \S\ref{sec:termination}).
-\item No primitive function receives a functional value, or returns a functional value.
+\item No primitive function receives a functional argument, nor returns a functional result.
 \item The main function has a type that ensures it neither receives a functional argument, nor returns a functional result.
 \end{enumerate}
 
@@ -1278,9 +1278,7 @@ The specialisation and inlining steps are taken from existing program optimisers
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-\todo{suggest more detailed comparative investigation of higher-order analysis versus defunctionalisation followed by first-order analysis.  Are there no literature refs in this area?}
-
-Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. Our method has already found practical use within the Catch tool, allowing a first-order pattern-match analysis to be applied to real Haskell programs.
+Higher-order functions are very useful, but may pose difficulties for certain types of analysis. Using the method we have described, it is possible to remove most functional values from most programs. A user can still write higher-order programs, but an analysis tool can work on equivalent first-order programs. Our method has already found practical use within the Catch tool, allowing a first-order pattern-match analysis to be applied to real Haskell programs. It would be interesting to investigate the relative accuracy of higher-order analysis methods with and without defunctionalisation.
 
 Our method works on whole programs, requiring sources for all function definitions. This requirement both increases transformation time, and precludes the use of closed-source libraries. We may be able to relax this requirement, precomputing first-order variants of libraries, or permitting some components of the program to be ignored.
 
