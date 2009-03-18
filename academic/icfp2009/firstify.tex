@@ -1,5 +1,19 @@
 \documentclass[preprint]{sigplanconf}
 
+%if 0
+
+Comments from Peter Jonsson
+---------------------------
+In section 3.4 you talk about that a certain transformation is unsound for impure or strict languages, but  x and y range over expressions so as far as I can see both your case-lam, bind-box and let-lam rules are for cbn, so the transformation can not be suitable for cbv at all?
+
+Is the components of the substitution in in Figure 3 reversed? You have [v/ \w -> x] where I would have expected [\w->x/v].
+
+The second paragraph in 4.1.2 mentions "expensive 1", but to actually get to that expression you have to beta-reduce (f 1), which took me some time to figure out (I was pondering whether you meant expensive x first).
+
+You talk about how GHC can "non-terminate" in 7.1 - how about "loop" instead? :-)
+
+%endif
+
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{natbib}
