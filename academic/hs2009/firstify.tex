@@ -589,8 +589,7 @@ As with the simplification rules, there may be some loss of sharing if the defin
 
 \subsection{Specialisation}
 
-\todo{not clear how free variables are handled (in Example 9 instead of |\x->x| what if you had |\x-> x:xs| ?). It is not
-clear how the free variables interact with the templates.}
+\todo{not clear how free variables are handled (in Example 9 instead of |\x->x| what if you had |\x-> x:xs| ?). It is not clear how the free variables interact with the templates.}
 
 For each application of a top-level function in which at least one argument has a lambda subexpression, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applies where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order by specialisation include |map|, |filter|, |foldr| and |foldl|.
 
@@ -1207,9 +1206,7 @@ In order to gain acceptable speed, we perform a number of optimisations over the
 
 \subsection{Program Size}
 
-\todo{make clear we do dead-code on both to compare}
-
-We measure program size by counting the number of lines of Core code, after a simple dead-code analysis to remove entirely unused function definitions. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers that it might cause an explosion in code size \cite{chin:higher_order_removal}.
+We measure the size of a program by counting the number of lines of Core code, after a simple dead-code analysis to remove entirely unused function definitions. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers that it might cause an explosion in code size \cite{chin:higher_order_removal}.
 
 \section{Higher-Order Analysis}
 \label{sec:strictness}
