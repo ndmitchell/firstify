@@ -116,7 +116,9 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \maketitle
 
 \begin{abstract}
-We describe a transformation which takes a higher-order program, and a produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
+\todo{The abstract is not as motivating as it could be, and misses the main goal of the work, which I have understood to be the analysis of higher-order programs by first-order analyses.}
+
+We describe a transformation which takes a higher-order program, and produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -241,6 +243,8 @@ We proceed by first giving a brief flavour of how these transformations may be u
 
 \subsection{Simplification}
 
+\todo{Add something like in 4.1, namely "The simplification rules aim to move lambda expressions upwards, and introduce lambdas for partially applied functions."}
+
 The simplification rules have two purposes: to remove some simple functional values, and to ensure a \textit{normal form} so other rules can apply. The simplification rules are simple, and many are found in optimising compilers. All the rules are given in \S\ref{sec:simplification_detail}.
 
 \begin{example}
@@ -325,6 +329,8 @@ notList xs = map_not xs
 \subsection{Goals}
 \label{sec:goals}
 
+\todo{In section 3.4, the authors introduce some goals divided into two classes: essential and desirable. It would be interesting to have a further explanation of why they classified each goal in each category.}
+
 We define a number of goals: some are \textit{essential}, and others are \textit{desirable}. If essential goals make desirable goals unachievable in full, we still aim to do the best we can.
 
 \subsubsection*{Essential}
@@ -362,7 +368,7 @@ simplify,arity,inline,specialise :: Prog -> Prog
 \end{code}
 \end{comment}
 
-This section gives a set of rules, which are applied non-deterministically. Many programs require a combination of rules to be applied, for example, the initial |incList| example requires simplification and specialisation rules.
+This section gives a set of rules, which are applied non-deterministically \todo{line overflow}. Many programs require a combination of rules to be applied, for example, the initial |incList| example requires simplification and specialisation rules.
 
 We have implemented our steps in a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. But to simplify the presentation here, we ignore these issues -- they are mostly tedious engineering concerns, and do not effect the underlying algorithm.
 
@@ -467,6 +473,8 @@ let v = x in {-" "-} \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
+\todo{draw out app-app and fun-app as because of our AST}
+
 The simplification rules aim to move lambda expressions upwards, and introduce lambdas for partially applied functions. The rules include standard simplification rules given in Figure \ref{fig:simplify}, which are found in most optimising compilers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. We believe that the combination of rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} are confluent.
 
 \subsubsection{Lambda Introduction}
@@ -492,8 +500,6 @@ even = \x -> (.) (\y -> not y) (\z -> odd z) x
 \subsubsection{Lambda Movement}
 \label{sec:sharing}
 
-\todo{The second paragraph in 4.1.2 mentions "expensive 1", but to actually get to that expression you have to beta-reduce (f 1), which took me some time to figure out (I was pondering whether you meant expensive x first).}
-
 The (bind-lam) rule inlines a lambda bound in a let expression. The (let-lam) rule can be responsible for a reduction in sharing:
 
 \begin{example}
@@ -511,7 +517,7 @@ f x =  \j ->  let  i = expensive x
               in   i + j
 \end{code}
 
-\noindent Now |expensive| is recomputed for every element in |xs|. We include this rule in our transformation, focusing on functional value removal at the expense of sharing.
+\noindent Now |(expensive 1)| is recomputed for every element in |xs|. We include this rule in our transformation, focusing on functional value removal at the expense of sharing.
 \end{example}
 
 \subsection{Inlining}
@@ -519,7 +525,7 @@ f x =  \j ->  let  i = expensive x
 
 We use inlining of top-level functions as the first stage in the removal of functional values stored within a constructor -- for example |Just (\x -> x)|. To eliminate a functional value stored inside a constructor we eliminate the containing constructor by making it the subject of a case expression and using the (case-con) rule. We move the constructor towards the case expression using inlining.
 
-We refer to expressions that evaluate to functional values inside constructors as \textit{boxed lambdas}. If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the body of the function definition is a boxed lambda; (2) the function application occurs as the subject of a case expression.
+We refer to expressions that evaluate to functional values inside constructors as \textit{boxed lambdas}. \todo{move the definition and examples of boxed lambdas here} If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the body of the function definition is a boxed lambda; (2) the function application occurs as the subject of a case expression.
 
 \begin{figure}
 \begin{code}
@@ -536,7 +542,7 @@ isLambda (ELam v x)      = True
 isLambda _               = False
 \end{code}
 
-The |isBox| function as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is |False| in any duplicate call. This modification does not change the result of any previously terminating evaluations.
+The |isBox| function as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is |False| in any duplicate call. This modification does not change the result of any previously terminating evaluations. \todo{explain}
 \caption{The |isBox| function, to test if an expression is a boxed lambda.}
 \label{fig:boxed_lambda}
 \end{figure}
@@ -582,6 +588,9 @@ case (f xs_) of alts_
 As with the simplification rules, there may be some loss of sharing if the definition being inlined has arity 0 -- a constant applicative form (CAF). A Haskell implementation computes these expressions at most once, and reuses their value as necessary. If they are inlined, this sharing will be lost.
 
 \subsection{Specialisation}
+
+\todo{not clear how free variables are handled (in Example 9 instead of |\x->x| what if you had |\x-> x:xs| ?). It is not
+clear how the free variables interact with the templates.}
 
 For each application of a top-level function in which at least one argument has a lambda subexpression, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applies where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order by specialisation include |map|, |filter|, |foldr| and |foldl|.
 
@@ -692,6 +701,8 @@ In all these examples, the |id| function has an argument which has a lambda expr
 \subsubsection{Generating Functions}
 \label{sec:generate_functions}
 
+\todo{rework, not clear}
+
 To generate a function from a template we first pick a unique function name. For each occurrence of |hole| in the template a fresh variable is substituted. The body of the new function uses all the fresh variables as lambda variables, then is produced by inlining the outer function symbol of the template. If a previous specialisation has already generated a function for this template, we reuse the previous function.
 
 \begin{examplerevisit}{\ref{ex:map_id}}
@@ -704,9 +715,9 @@ map_id = \v_1 -> map (\x -> x) v_1
 \noindent We inline the definition of |map|:
 
 \begin{code}
-map_id = \v_1 ->  (\f xs -> case  xs of
-                                  []    -> []
-                                  y:ys  -> f y : map f ys)
+map_id = \v_1 ->  (\f -> \xs -> case  xs of
+                                      []    -> []
+                                      y:ys  -> f y : map f ys)
                   (\x -> x) v_1
 \end{code}
 
@@ -723,8 +734,11 @@ map_id = \v_1 ->  let  xs = v_1
 \subsubsection{Using Templates}
 \label{sec:use_templates}
 
+\todo{rework}
+
 After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to |hole| is passed as an argument.
 
+\todo{example has changed, not same as original}
 \begin{exampleany}{\ref{ex:map_id} (continued)}
 \begin{code}
 map_id = \v_1 ->  let  xs = v_1
@@ -810,6 +824,8 @@ We have benchmarked these operations in a variety of settings and the list based
 
 \section{Restricted Completeness}
 \label{sec:completeness}
+
+\todo{The purpose of Section 6 is to classify any cases not covered.  In doing so we show that no obvious rule is missing and that all the rules are needed.}
 
 Our method would be \textit{complete} if it made all programs first-order. In this section we give three conditions, which if met, ensure a program can be made first-order. We start by showing where expressions creating functional values can reside in a resultant program, then show that this information enables us to make programs first-order.
 
@@ -913,6 +929,8 @@ In this example the lambda expression is never reached because the |Just| branch
 \subsection{Transformation to First-Order}
 \label{sec:consequences}
 
+\todo{not contributing to the arity of a function}
+
 Our proposition means that, provided the three restrictions are met, replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Another way of viewing the proposition is that after transformation the program will be \textit{first-order at runtime}, even if there are expressions that create or use functional values in the source program. Therefore, the following rewrites are valid:
 
 \ignore\begin{code}
@@ -925,6 +943,8 @@ After applying the (eta) rule and performing these rewrites, all programs are gu
 
 \section{Proof of Termination}
 \label{sec:termination}
+
+\todo{try and motivate this a bit better}
 
 \begin{comment}
 We can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
@@ -964,7 +984,7 @@ let x = \x -> x x in x x
 \end{code}
 \end{onepage}
 
-Such expressions are a problem for GHC, and can cause the compiler to loop if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. This limit is intended to give a strong guarantee of termination, and will only rarely be necessary -- hence the high bound.
+Such expressions are a problem for GHC, and can cause the compiler to loop if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. \todo{type safety means this can't happen} This limit is intended to give a strong guarantee of termination, and will only rarely be necessary -- hence the high bound.
 
 \subsection{Termination of Inlining}
 
@@ -1170,7 +1190,7 @@ The vast majority of programs which have residual uses of functional values resu
 
 \subsection{Termination Bound}
 
-The termination bound required varies from 2 to 11 for the sample programs (see Bound in Table \ref{tab:results}). If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no apparent relation between the size of a program and the termination bound.
+The termination bound required varies from 2 to 14 for the sample programs (see Bound in Table \ref{tab:results}). If we exclude the integer program, which is complicated by the primitive operations on functional values, the highest bound is 8. Most programs have a termination bound of 4. There is no apparent relation between the size of a program and the termination bound.
 
 \subsection{Creation and Uses of Functional Values}
 
@@ -1186,6 +1206,8 @@ The timing results were all measured on a 1.2GHz laptop, running GHC 6.8.2 \cite
 In order to gain acceptable speed, we perform a number of optimisations over the method presented in \S\ref{sec:detailed}. (1) We transform functions in an order determined by a topological sort with respect to the call-graph. (2) We delay the transformation of dictionary components, as these will often be eliminated. (3) We track the arity and boxed lambda status of each function.
 
 \subsection{Program Size}
+
+\todo{make clear we do dead-code on both to compare}
 
 We measure program size by counting the number of lines of Core code, after a simple dead-code analysis to remove entirely unused function definitions. On average the size of the resultant program is smaller by 30\% (see Size in Table \ref{tab:results}). The decrease in program size is mainly due to the elimination of dictionaries holding references to unnecessary code. An optimising compiler will perform dictionary specialisation, and therefore is likely to also reduce program size. We do not claim that defunctionalisation reduces code size, merely hope to alleviate concerns raised by previous papers that it might cause an explosion in code size \cite{chin:higher_order_removal}.
 
