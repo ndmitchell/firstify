@@ -1,0 +1,177 @@
+Review #1
+
+Comments
+
+This paper describes a defunctionalisation method which operates over
+the Core language from the York Haskell Compiler. In contrast to other
+approaches, like the one by Reynolds, it does not introduce new
+data-types neither an associated mini-interpreter. The new method
+presented in the paper has two limitations: First, it can reduce
+sharing; and second, the transformation is not complete. With regard
+to the first limitation, it is not painful since the method has been
+designed as a preliminary stage in program analysis. The second
+limitation is justified by the fact that the residual expressions can
+be characterised, and mild restrictions guarantee first order results.
+The method works by applying the following set of rules:
+simplification, inlining (unfolding), and specialization. A
+completeness proof is given under some restrictions. It is presented
+also a termination proof, the results of the implementation and the
+application of the method for some standard analyses.
+
+The paper is well written and easy to understand. In some parts, a
+more formal presentation is missing, but in general the presentation
+is good and the technical content very interesting. The authors give a
+table of results that are very encouraging. I wonder whether the
+implementation is publicly available. A page with a summary of
+experiments or a web interface would be very welcome.
+
+Comments for the authors:
+
+The abstract is not as motivating as it could be, and misses the main
+goal of the work, which I have understood to be the analysis of
+higher-order programs by first-order analyses. The keywords section
+includes "firstification", but in the rest of the paper this
+terminology is not used.?
+
+Sections 1 and 2 do make sense to me. In section 3, concretely in
+section 3.1, the authors should provide an explanation similar to the
+first line of section 4.1 (or similar one) of simplification as they
+do in the other rules. In section 3.4, the authors introduce some
+goals divided into two classes: essential and desirable. It would be
+interesting to have a further explanation of why they classified each
+goal in each category.
+
+In section 4, there is a typo in the first line. In section 4.1,
+provide appropriate references that justify the claim "All of the
+Simplification rules are correct individually", ç In section 4.1.2,
+when the authors say "Now expensive is recomputed for every...", I
+guess they mean "Now (expensive 1) is recomputed for every...". In
+section 4.2, after the introduction of boxed lamdas, the authors
+discuss the method and then introduce the formal definition and some
+examples of boxed lambdas. For the sake of clarity, the authors should
+move the formal definition and the examples after the line: "We refer
+to expressions that evaluate to functional values inside constructors
+as boxed lambdas". In figure 4, it is assumed that when a call to
+isBox is repeated the result is False. The authors should add an
+explanation. In section 4.3.2, in the first condition two examples are
+given. The second one is not a boxed-lambda according to isBox
+function. It could be after applying bind-box, but not as it is shown.
+I'm not comfortable with 4.3.3, and I think that it could be better
+explained, or a little bit more formalized. In example 9 (revisited),
+the second piece of code contains a lambda with two variables (...\f
+xs ->...), and it is not clear what it does mean. In section 4.3.4,
+here again, I think that a better explanation is needed, and the last
+sentence "Every subexpression corresponding..." either I do not
+understand it well or it is not happening in the example. The final
+result given in example 9 (continued) does not correspond to the
+supposed one given in example 9.
+
+I'm happy with section 5 and I have found it very interesting. Respect
+to section 6, I don't like it because I find it useless. I think that
+it is very difficult to have programs that fulfil these restrictions.
+Some motivation is needed to digest this pill.
+
+There is a typo in section 8.4, where authors say "The termination
+bound required varies from 2 to 11", because in the table the maximum
+value is 14. In section 8.7 is not clear whether the authors perform
+dead-code analysis to original program or only to the transformed one
+in order to compare them.
+
+Review #2
+
+Comments
+
+The paper introduces an approach to defunctionalisation based on
+inlining and specialisation. The method is not complete and can also
+lead to reduced sharing. However, the authors have used it in a
+program analysis tool and the results are encouraging.
+
+Unfortunately, the paper is often vague and sometimes even
+contradictory in the presentation of the approach. In particular, the
+transformation is not really formally defined. Section 4.4 is quite
+vague about the order in which optimisations are applied but it is
+absolutely crucial to the correctness of the optimisation. Also,
+several details are left unspecified. For instance, the applicability
+of the (eta) rule from Fig. 2 depends on the arity of f but the latter
+can be changed by (case-lam) and (let-lam) and it is not clear how
+this interaction should be resolved. Another example is the definition
+of boxed lambdas: Section 4.2 defines them as "expressions that
+evaluate to functional values inside constructors" (which is not
+statically decidable) but then later mentions expressions that
+"evaluate to a boxed lambda, but are not themselves boxed lambdas".
+This is quite confusing.
+
+The bottom line is that the paper does not really formally define the
+transformation and even the informal definition is, in my view,
+unsatisfactory. This, however, makes the results in Section 6 and 7
+impossible to follow and to verify.
+
+Section 8 is quite surprising since throughout the rest of the paper,
+the authors suggest that their approach is mainly useful in program
+analysis tools and not in general-purpose optimisers. In particular,
+it is not clear to me how to deal with the (let-lam) and (case-lam)
+rules would be highly unsafe in a general-purpose optimiser.
+
+Finally, the transformation itself seems overly complicated to me.
+Instead of generating templates from lambdas, why not just lambda-lift
+the program and then specialise on named functions? This is, in fact,
+the method suggested in "Stream Fusion: From Lists to Streams to
+Nothing at All" (Coutts et. al, 2007).
+
+Review #3
+
+Comments
+
+The paper describes a new approach to defunctionalisation which has
+the advantage of not introducing new data types (in contrast to
+Reynolds' algorithm). The approach does not always eliminate all
+functional values, but experiments on a large set of benchmarks shows
+that it often removes most of them.
+
+This was a pleasant paper to read. Few typos, clear explanations and
+many examples (almost to a fault).
+
+While the goal of the transformation is not compilation, it is clear
+that the approach proposed would be used within a compiler to perform
+analysis. So space and time are real issues when compiling. Although a
+theoretical complexity analysis is not provided in the paper, it is
+reassuring to see very good resource usage in the experiments: at most
+1.2 seconds run time, and no more than a 27% expansion of the program
+(and usually a compression). Nevertheless there might be certain forms
+of programs that do not behave so well. I would have liked to see some
+results with synthetic programs specifically designed to exhibit the
+worst case. I saw a few places where combinatorial explosion might
+occur (such as the bind-lam rule). The proof of termination is quite
+elaborate, and the particulars should be justified (after all much
+simpler methods could have been used, such as stop applying rules
+after a certain number of steps proportional to the size of the
+program). Some of the constants are arbitrary (e.g. applying at most
+n=1000 times bind-lam and bind-box in any definition body). Is this
+close to what is normally needed or very much bigger? In Section 7.2
+it is explained that functions are inlined within their own body at
+most once, so it is unclear how multiply recursive functions (fib,
+tree search, ...) are handled.
+
+Some rules in Figure 2 are not clear. The app-app and fun-app seem
+redundant since the lhs and rhs of the rules have the same AST. The
+rule case-lam has a \v in the lhs of one case branch, but it isn't
+clear if all branches must have this pattern or just one branch.
+
+In Section 4.3 it is not clear how free variables are handled (in
+Example 9 instead of \x->x what if you had \x-> x:xs ?). It is not
+clear how the free variables interact with the templates.
+
+In example 16, the case's "Just f" branch should have been removed by
+the case-con rule, so the lambda expression is not "never reached", it
+is simply not there.
+
+I think supercompilation is the closest related work, so I was
+surprised to see such a small section (10.3) about it.
+
+Minor comments and typos:
+
+and a produces an equivalent (remove a)
+
+runtime -> run time (3 times)
+
+Section 6.4: replacing all lambda expressions (add: not contributing to arity)
