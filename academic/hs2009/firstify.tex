@@ -116,9 +116,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \maketitle
 
 \begin{abstract}
-\todo{The abstract is not as motivating as it could be, and misses the main goal of the work, which I have understood to be the analysis of higher-order programs by first-order analyses.}
-
-We describe a transformation which takes a higher-order program, and produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
+We describe a transformation which takes a higher-order program, and produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. We can use our method to improve the results of existing analysis operations, including strictness analysis, pattern-match safety and termination checking. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -368,7 +366,7 @@ simplify,arity,inline,specialise :: Prog -> Prog
 \end{code}
 \end{comment}
 
-This section gives a set of rules, which are applied non-deterministically \todo{line overflow}. Many programs require a combination of rules to be applied, for example, the initial |incList| example requires simplification and specialisation rules.
+This section gives a set of rules, all of which are applied non-deterministically, until no further rules apply. Many programs require a combination of rules to be applied, for example, the initial |incList| example requires simplification and specialisation rules.
 
 We have implemented our steps in a monadic framework to deal with issues such as obtaining unique free variables and tracking termination constraints. But to simplify the presentation here, we ignore these issues -- they are mostly tedious engineering concerns, and do not effect the underlying algorithm.
 
