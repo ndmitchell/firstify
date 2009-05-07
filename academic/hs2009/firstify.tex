@@ -241,8 +241,6 @@ We proceed by first giving a brief flavour of how these transformations may be u
 
 \subsection{Simplification}
 
-\todo{Add something like in 4.1, namely "The simplification rules aim to move lambda expressions upwards, and introduce lambdas for partially applied functions."}
-
 The simplification rules have two purposes: to remove some simple functional values, and to ensure a \textit{normal form} so other rules can apply. The simplification rules are simple, and many are found in optimising compilers. All the rules are given in \S\ref{sec:simplification_detail}.
 
 \begin{example}
@@ -327,9 +325,7 @@ notList xs = map_not xs
 \subsection{Goals}
 \label{sec:goals}
 
-\todo{In section 3.4, the authors introduce some goals divided into two classes: essential and desirable. It would be interesting to have a further explanation of why they classified each goal in each category.}
-
-We define a number of goals: some are \textit{essential}, and others are \textit{desirable}. If essential goals make desirable goals unachievable in full, we still aim to do the best we can.
+We define a number of goals: some are \textit{essential}, and others are \textit{desirable}. If essential goals make desirable goals unachievable in full, we still aim to do the best we can. Essential goals are either necessary to combine our transformation with an analysis, or significantly simplify any subsequent analysis.
 
 \subsubsection*{Essential}
 
@@ -471,9 +467,7 @@ let v = x in {-" "-} \w -> y
 \label{fig:lambda_simplify}
 \end{figure}
 
-\todo{draw out app-app and fun-app as because of our AST}
-
-The simplification rules aim to move lambda expressions upwards, and introduce lambdas for partially applied functions. The rules include standard simplification rules given in Figure \ref{fig:simplify}, which are found in most optimising compilers, such as GHC \cite{spj:transformation}. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. We believe that the combination of rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} are confluent.
+The simplification rules aim to move lambda expressions upwards, and introduce lambdas for partially applied functions. The rules include standard simplification rules given in Figure \ref{fig:simplify}, which are found in most optimising compilers, such as GHC \cite{spj:transformation}. The (app-app) and (fun-app) rules are a consequence of our application expressions taking a list of arguments. We also make use of additional rules which deal specifically with lambda expressions, given in Figure \ref{fig:lambda_simplify}. All of the simplification rules are correct individually. The rules are applied to any subexpression, as long as any rule matches. We believe that the combination of rules from Figures \ref{fig:simplify} and \ref{fig:lambda_simplify} are confluent.
 
 \subsubsection{Lambda Introduction}
 
@@ -1248,9 +1242,6 @@ No doubt there are other ways in which the above analysis methods could be impro
 
 \section{Related Work}
 \label{sec:related}
-
-\todo{Cite: higher order functions considered unnecessary for higher-order programming. http://www-cse.ucsd.edu/~goguen/pps/utyop.ps}
-
 
 \subsection{Reynolds style defunctionalisation}
 
