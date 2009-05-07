@@ -816,9 +816,7 @@ We have benchmarked these operations in a variety of settings and the list based
 \section{Restricted Completeness}
 \label{sec:completeness}
 
-\todo{The purpose of Section 6 is to classify any cases not covered.  In doing so we show that no obvious rule is missing and that all the rules are needed.}
-
-Our method would be \textit{complete} if it made all programs first-order. In this section we give three conditions, which if met, ensure a program can be made first-order. We start by showing where expressions creating functional values can reside in a resultant program, then show that this information enables us to make programs first-order.
+Our method would be \textit{complete} if it made all programs first-order. In this section we give three conditions, which if met, ensure a program can be made first-order. In doing so, we hope to show that no obvious rule is missing. We start by showing where expressions creating functional values can reside in a resultant program, then show that this information enables us to make programs first-order.
 
 \subsection{Proposition}
 
@@ -920,9 +918,7 @@ In this example the lambda expression is never reached because the |Just| branch
 \subsection{Transformation to First-Order}
 \label{sec:consequences}
 
-\todo{not contributing to the arity of a function}
-
-Our proposition means that, provided the three restrictions are met, replacing all lambda expressions in the resultant program with $\bot{}$ will give an identical program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Another way of viewing the proposition is that after transformation the program will be \textit{first-order at runtime}, even if there are expressions that create or use functional values in the source program. Therefore, the following rewrites are valid:
+As a result of our proposition, provided the three restrictions are met, we can replace all lambda expressions in the resultant program which don't contribute to the arity of a function with $\bot{}$, to give an equivalent program. In addition, any uses of functional values are guaranteed to actually be operating on $\bot{}$, as no functional values could have been created. Another way of viewing the proposition is that after transformation the program will be \textit{first-order at runtime}, even if there are expressions that create or use functional values in the source program. Therefore, the following rewrites are valid:
 
 \ignore\begin{code}
 (\v -> x)  => bot    {-"\hspace{3mm} \hbox{if not contributing to the arity of a function}"-}
@@ -975,7 +971,7 @@ let x = \x -> x x in x x
 \end{code}
 \end{onepage}
 
-Such expressions are a problem for GHC, and can cause the compiler to loop if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we have set $n$ to 1000, and have never had this limit reached. \todo{type safety means this can't happen} This limit is intended to give a strong guarantee of termination, and will only rarely be necessary -- hence the high bound.
+Such expressions are a problem for GHC, and can cause the compiler to loop if encoded as data structures \cite{spj:inlining}. Other transformation systems \cite{chin:higher_order_removal} make use of type annotations to ensure these reductions terminate. To guarantee termination, we apply (bind-lam) or (bind-box) at most $n$ times in any definition body. If the body is altered by either inlining or specialisation, we reset the count. Currently we set $n$ to 1000, but have never seen the count exceed 50 on a real program -- it is not a problem that arises in practice.
 
 \subsection{Termination of Inlining}
 
