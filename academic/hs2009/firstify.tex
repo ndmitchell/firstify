@@ -661,18 +661,16 @@ In all these examples, the |id| function has an argument which has a lambda expr
 \subsubsection{Generating Functions}
 \label{sec:generate_functions}
 
-\todo{rework, not clear}
-
-To generate a function from a template we first pick a unique function name. For each occurrence of |hole| in the template a fresh variable is substituted. The body of the new function uses all the fresh variables as lambda variables, then is produced by inlining the outer function symbol of the template. If a previous specialisation has already generated a function for this template, we reuse the previous function.
+To generate a function from a template, we first pick a unique name for the new function. We replace each |hole| in the template with a unique fresh variable, then inline the outer function symbol. The body of the new function is the modified template, contained within lambda abstractions introducing each fresh variable used. If a previous specialisation has already generated a function for this template, we reuse the previous function.
 
 \begin{examplerevisit}{\ref{ex:map_id}}
-Consider the template |map (\x -> x) hole|. Let |v_1| be the fresh argument variable for the single |hole| placeholder, and |map_id| be the function name:
+Consider the template |map (\x -> x) hole|. Let |v_1| be the fresh variable for the single |hole| placeholder, and |map_id| be the function name:
 
 \begin{code}
 map_id = \v_1 -> map (\x -> x) v_1
 \end{code}
 
-\noindent We inline the definition of |map|:
+\noindent We inline the outer function symbol (|map|):
 
 \begin{code}
 map_id = \v_1 ->  (\f -> \xs -> case  xs of
