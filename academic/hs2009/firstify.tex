@@ -517,7 +517,9 @@ f x =  \j ->  let  i = expensive x
 
 We use inlining of top-level functions as the first stage in the removal of functional values stored within a constructor -- for example |Just (\x -> x)|. To eliminate a functional value stored inside a constructor we eliminate the containing constructor by making it the subject of a case expression and using the (case-con) rule. We move the constructor towards the case expression using inlining.
 
-We refer to expressions that evaluate to functional values inside constructors as \textit{boxed lambdas}. \todo{move the definition and examples of boxed lambdas here} If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the body of the function definition is a boxed lambda; (2) the function application occurs as the subject of a case expression.
+\begin{definition}
+An expression |e| is a \textit{boxed lambda} iff |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}. A boxed lambda is an expression which evaluates to a functional value inside a constructor.
+\end{definition}
 
 \begin{figure}
 \begin{code}
@@ -534,14 +536,10 @@ isLambda (ELam v x)      = True
 isLambda _               = False
 \end{code}
 
-The |isBox| function as presented may not terminate, but by simply keeping a list of followed functions, we can assume the result is |False| in any duplicate call. This modification does not change the result of any previously terminating evaluations. \todo{explain}
+The |isBox| function as presented may not terminate. Any non-terminating evaluation can be easily detected (by remembering which function bodies have been examined) and is defined to be |False|.
 \caption{The |isBox| function, to test if an expression is a boxed lambda.}
 \label{fig:boxed_lambda}
 \end{figure}
-
-\begin{definition}
-An expression |e| is a boxed lambda if |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}.
-\end{definition}
 
 \begin{example}
 Recalling that |[e]| is shorthand for |(:) e []|, where |(:)| is the cons constructor, the following expressions are boxed lambdas:
@@ -564,6 +562,8 @@ let v = [\x -> x] in v
 
 The final three expressions all \textit{evaluate to} a boxed lambda, but are not themselves boxed lambdas.
 \end{example}
+ 
+If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the body of the function definition is a boxed lambda; (2) the function application occurs as the subject of a case expression.
 
 \begin{definition}
 The inlining transformation is specified by:
