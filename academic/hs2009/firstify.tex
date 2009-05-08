@@ -692,9 +692,7 @@ map_id = \v_1 ->  let  xs = v_1
 \subsubsection{Using Templates}
 \label{sec:use_templates}
 
-\todo{rework}
-
-After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to |hole| is passed as an argument.
+Every expression |e| matching an existing template |t| can be replaced by a call to the function generated from |t|. All subexpressions in |e| which match up with |hole| in |t| are passed as arguments.
 
 \begin{exampleany}{\ref{ex:map_id} (continued)}
 \begin{code}
