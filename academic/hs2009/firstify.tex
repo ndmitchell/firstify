@@ -692,7 +692,7 @@ map_id = \v_1 ->  let  xs = v_1
 \subsubsection{Using Templates}
 \label{sec:use_templates}
 
-Every expression |e| matching an existing template |t| can be replaced by a call to the function generated from |t|. All subexpressions in |e| which match up with |hole| in |t| are passed as arguments.
+An expression |e|, matching an existing template |t|, can be replaced by a call to the function generated from |t|. All subexpressions in |e| which match up with |hole| in |t| are passed as arguments.
 
 \begin{exampleany}{\ref{ex:map_id} (continued)}
 \begin{code}
@@ -1260,7 +1260,7 @@ The use of a numeric termination bound in the homeomorphic embedding is regretta
 
 Many analysis methods, in fields such as strictness analysis and termination analysis, start out first-order and are gradually extended to work in a higher-order language. Defunctionalisation offers an alternative approach: instead of extending the analysis method, we transform the functional values away, enabling more analysis methods to work on a greater range of programs.
 
-\balance
+% \balance
 
 \bibliographystyle{plainnat}
 \small
