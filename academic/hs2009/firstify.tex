@@ -609,45 +609,15 @@ Specialisation first finds the application of |map| in |main|, and generates the
 \begin{code}
 main xs = map_id xs
 
-map_id xs = case  xs of
-                  []    -> []
-                  y:ys  -> y : map_id ys
+map_id v_1 =  let  xs = v_1
+              in   case  xs of
+                         []    -> []
+                         y:ys  -> y : map_id ys
 \end{code}
 
 \noindent The resulting code is first-order.
 \end{example}
 
-\begin{comment}
-\begin{figure}
-
-\begin{code}
-shouldSpecialise :: Expr -> Bool
-shouldSpecialise (EFun f xs_) = any (\x -> isLambda x || isBox x) (universe (EFun f xs_))
-shouldSpecialise _ = False
-
-abstractTemplate :: Expr -> Expr
-abstractTemplate x =
-    transform (\x -> if abstract x then hole else x) $
-    abstractVars (freeVars x) x
-
-abstract :: Expr -> Bool
-abstract (ECon c xs_) = all abstract xs_
-abstract (EFun f xs_) = all abstract xs_
-abstract (EApp x xs_) = all abstract xs_
-abstract (ELet v x y) = abstract x && abstract (abstractVars [v] y)
-abstract (ECase x alts_) = abstract x && all alt alts_
-   where alt (EAlt c vs_ x) = abstract (abstractVars vs_ x)
-abstract x = (x == hole)
-
-abstractVars :: [VarName] -> Expr -> Expr
-abstractVars vs x = ellipses
-    -- replace the variables |vs| in |x| with |abstract|
-    -- respecting variables rebound locally
-\end{code}
-\caption{Template generation function.}
-\label{fig:template_generation}
-\end{figure}
-\end{comment}
 
 \subsubsection{Generating Templates}
 \label{sec:need_templates}
@@ -729,7 +699,6 @@ map_id = \v_1 ->  let  xs = v_1
 
 After a function has been generated for each template, every expression matching a template can be replaced by a call to the new function. Every subexpression corresponding to |hole| is passed as an argument.
 
-\todo{example has changed, not same as original}
 \begin{exampleany}{\ref{ex:map_id} (continued)}
 \begin{code}
 map_id = \v_1 ->  let  xs = v_1
@@ -930,8 +899,6 @@ After applying the (eta) rule and performing these rewrites, all programs are gu
 
 \section{Proof of Termination}
 \label{sec:termination}
-
-\todo{try and motivate this a bit better}
 
 \begin{comment}
 We can remove all data types by encoding them as functions, as described in \citet{naylor:reduceron}. If we then had a transformation which made the program first-order \textit{without} introducing any data types, we would end up with a program without data or closures, which is incapable of storing an unbounded amount of information. Since with higher-order functions we can implement a Turing machine \cite{turing:halting}, and without an unbounded store we cannot, such a transformation cannot exist.
