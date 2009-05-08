@@ -518,7 +518,7 @@ f x =  \j ->  let  i = expensive x
 We use inlining of top-level functions as the first stage in the removal of functional values stored within a constructor -- for example |Just (\x -> x)|. To eliminate a functional value stored inside a constructor we eliminate the containing constructor by making it the subject of a case expression and using the (case-con) rule. We move the constructor towards the case expression using inlining.
 
 \begin{definition}
-An expression |e| is a \textit{boxed lambda} iff |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}. A boxed lambda is an expression which evaluates to a functional value inside a constructor.
+An expression |e| is a \textit{boxed lambda} iff |isBox e == True|, where |isBox| is defined as in Figure \ref{fig:boxed_lambda}. A boxed lambda evaluates to a functional value inside a constructor.
 \end{definition}
 
 \begin{figure}
@@ -581,8 +581,6 @@ As with the simplification rules, there may be some loss of sharing if the defin
 
 \subsection{Specialisation}
 
-\todo{not clear how free variables are handled (in Example 9 instead of |\x->x| what if you had |\x-> x:xs| ?). It is not clear how the free variables interact with the templates.}
-
 For each application of a top-level function in which at least one argument has a lambda subexpression, a specialised variant is created, and used where applicable. The process follows the same pattern as constructor specialisation \cite{spj:specconstr}, but applies where function arguments are lambda expressions, rather than known constructors. Examples of common functions whose applications can usually be made first-order by specialisation include |map|, |filter|, |foldr| and |foldl|.
 
 The specialisation transformation makes use of \textit{templates}. A template is an expression where some subexpressions are omitted, denoted by the |hole| symbol. The process of specialisation proceeds as follows:
@@ -632,7 +630,7 @@ id (\x -> x)
 map f [\x -> x]
 id (Just (\x -> x + 1))
 f (\v -> v) True
-\end{code}
+\end{code}\codeexample
 \end{example}
 
 
@@ -651,12 +649,13 @@ We perform abstraction to reduce the number of different templates required, by 
 Template & Abstract Template \\
 |id (\x -> x)|                & |id (\x -> x)| \\
 |id (Just (\x -> x))|         & |id (Just (\x -> x))| \\
+|id (\x -> x:xs)|             & |id (\x -> x : hole)| \\
 |id (\x -> let y = 12 in 4)|  & |id (\x -> hole)| \\
 |id (\x -> let y = 12 in x)|  & |id (\x -> let y = hole in x)| \\
 \end{tabular}
 \smallskip
 
-In all these examples, the |id| function has an argument which has a lambda expression as a subexpression. In the final two cases, there are subexpressions which do not depend on variables bound within the lambda -- these have been removed and replaced with |hole|.
+In all these examples, the |id| function has an argument which has a lambda expression as a subexpression. In the last three cases, there are subexpressions which do not depend on variables bound by the lambda -- these have been removed and replaced with |hole|.
 \end{example}
 
 \subsubsection{Generating Functions}
