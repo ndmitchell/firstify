@@ -116,7 +116,7 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 \maketitle
 
 \begin{abstract}
-We describe a transformation which takes a higher-order program, and produces an equivalent first-order program. Unlike Reynolds style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. We can use our method to improve the results of existing analysis operations, including strictness analysis, pattern-match safety and termination checking. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
+We describe a transformation which takes a higher-order program, and produces an equivalent first-order program. Unlike Reynolds-style defunctionalisation, it does not introduce any new data types, and the results are more amenable to subsequent analysis operations. We can use our method to improve the results of existing analysis operations, including strictness analysis, pattern-match safety and termination checking. Our transformation is implemented, and works on a Core language to which Haskell programs can be reduced. Our method cannot always succeed in removing \textit{all} functional values, but in practice is remarkably successful.
 \end{abstract}
 
 \category{D.3}{Software}{Programming Languages}
@@ -158,7 +158,7 @@ Although this first-order variant of |incList| is longer (excluding the library 
 
 \smallskip
 
-Our defunctionalisation method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new. As far back as 1972 Reynolds gave a solution, now known as \textit{Reynolds style defunctionalisation} \cite{reynolds:defunc}. Unfortunately, this method effectively introduces a mini-interpreter, which causes problems for analysis tools. Our method produces a program closer to what a human might have written, if denied the use of functional values.
+Our defunctionalisation method processes the whole program to remove functional values, without changing the semantics of the program. This idea is not new. As far back as 1972 Reynolds gave a solution, now known as \textit{Reynolds-style defunctionalisation} \cite{reynolds:defunc}. Unfortunately, this method effectively introduces a mini-interpreter, which causes problems for analysis tools. Our method produces a program closer to what a human might have written, if denied the use of functional values.
 
 There are two significant limitations to our method:
 
@@ -335,7 +335,7 @@ We define a number of goals: some are \textit{essential}, and others are \textit
 
 \paragraph{Recover the original program.} Our transformation is designed to be performed before analysis. It is important that the results of the analysis can be presented in terms of the original program. We need a method for transforming expressions in the resultant program into equivalent expressions in the original program.
 
-\paragraph{Introduce no data types.} Reynolds method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type into the program. We aim to eliminate the higher-order aspects of a program \textit{without} introducing any new data types. By not introducing any data types we avoid introducing an interpreter, which can be a bottleneck for subsequent analysis. By composing our transformation out of existing transformations, none of which introduces data types, we can easily ensure that our transformation does not introduce data types.
+\paragraph{Introduce no data types.} Reynolds' method introduces a new data type that serves as a representation of functions, then embeds an interpreter for this data type into the program. We aim to eliminate the higher-order aspects of a program \textit{without} introducing any new data types. By not introducing any data types we avoid introducing an interpreter, which can be a bottleneck for subsequent analysis. By composing our transformation out of existing transformations, none of which introduces data types, we can easily ensure that our transformation does not introduce data types.
 
 
 \subsubsection*{Desirable}
@@ -562,7 +562,7 @@ let v = [\x -> x] in v
 
 The final three expressions all \textit{evaluate to} a boxed lambda, but are not themselves boxed lambdas.
 \end{example}
- 
+
 If a boxed lambda is bound in a let expression, we substitute the let binding, using the (bind-box) rule from Figure \ref{fig:lambda_simplify}. We only inline a function if two conditions both hold: (1) the body of the function definition is a boxed lambda; (2) the function application occurs as the subject of a case expression.
 
 \begin{definition}
@@ -1143,7 +1143,7 @@ The termination bound required varies from 2 to 14 for the sample programs (see 
 
 \subsection{Creation and Uses of Functional Values}
 
-We use Yhc generated programs as input. Yhc performs desugaring of the Haskell source code, introducing dictionaries of functions to implement type classes, and performing lambda lifting \cite{lambda_lift}. As a result the input programs have no lambda expressions, only partial application. Conversely, the (eta) rule from Figure \ref{fig:simplify} ensures resultant programs have no partial application, only lambda expressions. Most programs in our test suite start with hundreds of partial applications, but only 9 resultant programs contain lambda expressions (see HO Create in Table \ref{tab:results}).
+We use Yhc-generated programs as input. Yhc performs desugaring of the Haskell source code, introducing dictionaries of functions to implement type classes, and performing lambda lifting \cite{lambda_lift}. As a result the input programs have no lambda expressions, only partial application. Conversely, the (eta) rule from Figure \ref{fig:simplify} ensures resultant programs have no partial application, only lambda expressions. Most programs in our test suite start with hundreds of partial applications, but only 9 resultant programs contain lambda expressions (see HO Create in Table \ref{tab:results}).
 
 For the purposes of testing defunctionalisation, we have worked on unmodified Yhc libraries, including all the low-level detail. For example, |readFile| in Yhc is implemented in terms of file handles and pointer operations. Most analysis operations work on an abstracted view of the program, which reduces the number and complexity of functional values.
 
@@ -1196,14 +1196,14 @@ Agda's termination analysis reports that |downFrom| may not terminate. By genera
 \end{example}
 \smallskip
 
-No doubt there are other ways in which the above analysis methods could be improved, by extending and reworking the analysis machinery itself. But a big advantage of adding a preliminary defunctionalisation stage is that it is modular: the analysis is treated as a black box. A combination with Reynolds style defunctionalisation does not improve either analysis.
+No doubt there are other ways in which the above analysis methods could be improved, by extending and reworking the analysis machinery itself. But a big advantage of adding a preliminary defunctionalisation stage is that it is modular: the analysis is treated as a black box. A combination with Reynolds-style defunctionalisation does not improve either analysis.
 
 \section{Related Work}
 \label{sec:related}
 
-\subsection{Reynolds style defunctionalisation}
+\subsection{Reynolds-style defunctionalisation}
 
-Reynolds style defunctionalisation \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
+Reynolds-style defunctionalisation \cite{reynolds:defunc} is the seminal method for generating a first-order equivalent of a higher-order program.
 
 \begin{example}
 \begin{code}
@@ -1240,7 +1240,7 @@ The closest work to ours is by \citet{chin:higher_order_removal}, which itself i
 \item Their method makes use of the \textit{types} of expressions, information that must be maintained and extended to work with additional type systems.
 \item Their method has \textit{no inlining} step, or any notion of boxed lambdas. Functional values within constructors are ignored. The authors suggest the use of deforestation \cite{wadler:deforestation} to help remove them, but deforestation transforms the program more than necessary, and still fails to eliminate many functional values.
 \item Their specialisation step only applies to outermost lambda expressions, not lambdas within constructors.
-\item To ensure termination of the specialisation step, they \textit{never specialise a recursive function} unless it has all functional arguments passed identically in all recursive calls. This restriction is satisfied by higher-order functions such as |map|, but fails in many other cases.
+\item To ensure termination of the specialisation step, they never specialise a recursive function unless it has all functional arguments passed identically in all recursive calls. This restriction is satisfied by higher-order functions such as |map|, but fails in many other cases.
 \end{itemize}
 
 In addition, functional programs now use monads, IO continuations and type classes as a matter of course. Such features were still experimental when Chin and Darlington developed their method and it did not handle them. Our work can be seen as a successor to theirs, indeed we achieve most of the aims set out in their future work section. We have tried their examples, and can confirm that all of them are successfully handled by our system. Some of their observations and extensions apply equally to our work: for example, they suggest possible methods of removing accumulating functions such as in Example \ref{ex:functional_lists}.
