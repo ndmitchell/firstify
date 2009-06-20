@@ -1,4 +1,4 @@
-\documentclass[preprint]{sigplanconf}
+\documentclass{sigplanconf}
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -96,9 +96,9 @@ transform :: (Expr -> Expr) -> Expr -> Expr
 
 \begin{document}
 
-\conferenceinfo{Haskell Symposium 2009}{date, City.} %
-\copyrightyear{2009} %
-\copyrightdata{[to be supplied]}
+\conferenceinfo{Haskell'09,} {September 3, 2009, Edinburgh, Scotland, UK.}
+\CopyrightYear{2009}
+\copyrightdata{978-1-60558-508-6/09/09}
 
 \titlebanner{} % \today{} - \currenttime{}}        % These are ignored unless
 \preprintfooter{}   % 'preprint' option specified.
@@ -122,7 +122,7 @@ We describe a transformation which takes a higher-order program, and produces an
 \category{D.3}{Software}{Programming Languages}
 
 \terms
-languages, transformation
+Languages
 
 \keywords
 Haskell, defunctionalisation, firstification
@@ -489,6 +489,8 @@ even = \x -> (.) (\y -> not y) (\z -> odd z) x
 \noindent Now all three function applications are fully-applied. The (eta) rule replaces partial application with lambda expressions, making functional values more explicit, which permits other transformations.
 \end{example}
 
+In Haskell, unrestricted $\eta$-expansion is \textit{not} correct as the |seq| primitive allows |bot| to be distinguished from |\v -> bot|. However, our (eta) rule only transforms applications of partially-applied functions, which must evaluate to lambda abstractions. Therefore our (eta) rule is similar to replacing |\v -> x| with |\w -> (\v -> x) w| -- a transformation that is correct even allowing for |seq|.
+
 \subsubsection{Lambda Movement}
 \label{sec:sharing}
 
@@ -773,14 +775,14 @@ snoc = (:)
 list = reverse
 \end{code}
 
-We have benchmarked these operations in a variety of settings and the list based version appears to use approximately 75\% of the memory, and 65\% of the time required by the function-based solution. We suspect there are sometimes efficiency savings to storing data in closures, but not for snoc-based lists.
+We have benchmarked these operations in a variety of settings and the list based version appears to use approximately 75\% of the memory, and 65\% of the time required by the function-based solution.
 \end{examplename}
 
 
 \section{Restricted Completeness}
 \label{sec:completeness}
 
-Our method would be \textit{complete} if it made all programs first-order. In this section we give three conditions, which if met, ensure a program can be made first-order. In doing so, we hope to show that no obvious rule is missing. We start by showing where expressions creating functional values can reside in a resultant program, then show that this information enables us to make programs first-order.
+Our method would be \textit{complete} if it made all programs first-order. In this section we give three conditions, which if met, ensure a program can be made first-order. In doing so, we hope to show that no obvious rule is missing.
 
 \subsection{Proposition}
 
@@ -981,7 +983,7 @@ main = f (Value head)
 In the first iteration, the specialiser generates a version of |f| specialised for the argument |Value head|. In the second iteration it would specialise for |Wrap (Value head)|, then in the third with |Wrap (Wrap (Value head))|. Specialisation would generate an infinite number of specialisations of |f|.
 \end{example}
 
-To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{leuschel:homeomorphic}. The relation $x \unlhd y$ indicates the expression $x$ is an embedding of $y$. We can define $\unlhd$ using the following rewrite rule:
+To ensure we only specialise a finite number of times we use a homeomorphic embedding \cite{kruskal:tree}. The relation $x \unlhd y$ indicates the expression $x$ is an embedding of $y$. We can define $\unlhd$ using the following rewrite rule:
 
 \begin{center}
 $\mathit{emb} = \{f(x_1,\dots,x_n) \rightarrow x_i \, || \, 1 \leq i \leq n\}$
@@ -1000,7 +1002,7 @@ $d(a,a)$ & $d(b(a),c(c(a)))$    & $b(a,a)$ & $b(a,a,a)$
 \end{center}
 \end{example}
 
-The homeomorphic embedding $\unlhd$ is a well-quasi order, meaning that for every infinite sequence of expressions $e_1,e_2 \ldots$ over a finite alphabet, there exist indicies $i < j$ such that $e_i \unlhd e_j$. This result is sometimes used in program optimisation to ensure an algorithm over expressions performs a bounded number of iterations, by stopping at iteration $n$ once $\exists i \bullet 1 \leq i < n \wedge e_i \unlhd e_n$ -- for example by \citet{jonsson:supercompilation}.
+The homeomorphic embedding $\unlhd$ is a well-quasi order, as shown by Kruskal's tree theorem \cite{kruskal:tree}. This property means that for every infinite sequence of expressions $e_1,e_2 \ldots$ over a finite alphabet, there exist indicies $i < j$ such that $e_i \unlhd e_j$. This result is sometimes used in program optimisation to ensure an algorithm over expressions performs a bounded number of iterations, by stopping at iteration $n$ once $\exists i \bullet 1 \leq i < n \wedge e_i \unlhd e_n$ -- for example by \citet{jonsson:supercompilation}.
 
 For each function definition, we associate a set of expressions $S$. After generating a template $t$, we only specialise with that template if $\forall s \in S \bullet s \ntrianglelefteq t$. After specialising an expression $e$ with template $t$, we add $t$ to the set $S$ associated with the function definition containing $e$. When we generate a new function from a template, we copy the $S$ associated with the function at the root of the template.
 
